@@ -1,7 +1,7 @@
-// domRefs.js - Centraliza todas as referências a elementos do DOM
+// Meu arquivo para centralizar todas as referências a elementos do DOM.
 
 export const dom = {
-    // Elementos da tela de autenticação (Login)
+    // Minha tela de autenticação (Login)
     authScreen: document.getElementById('auth-screen'),
     mainContent: document.getElementById('main-content'),
     managerDashboard: document.getElementById('manager-dashboard'),
@@ -17,7 +17,7 @@ export const dom = {
     managerPassInput: document.getElementById('manager-pass'),
     loginBtnGerencia: document.getElementById('login-btn-gerencia'),
     
-    // Elementos do PDV (Ponto de Venda)
+    // Meu PDV (Ponto de Venda)
     employeeSwitcherSelect: document.getElementById('employee-switcher-select'),
     pdvEmployeeOnlineStatus: document.getElementById('pdv-employee-online-status'),
     status: document.getElementById('status-display'),
@@ -47,7 +47,7 @@ export const dom = {
     sinalLabel: document.getElementById('sinal-label'),
     restanteLabel: document.getElementById('restante-label'),
     
-    // Botões de Ação do PDV
+    // Meus botões de ação do PDV
     btnNovo: document.getElementById('btn-novo'),
     btnFechar: document.getElementById('btn-fechar'),
     btnAtualizar: document.getElementById('btn-atualizar'),
@@ -56,29 +56,29 @@ export const dom = {
     liquidarBtn: document.getElementById('liquidarBtn'),
     btnSair: document.getElementById('btn-sair'),
     
-    // Navegação e Busca de Pedidos
+    // Minha navegação e busca de pedidos
     btnAnterior: document.getElementById('btn-anterior'),
     btnProximo: document.getElementById('btn-proximo'),
     searchInput: document.getElementById('order-search-input'),
     searchBtn: document.getElementById('search-order-btn'),
 
-    // Botões de Acesso e Relatórios
+    // Meus botões de acesso e relatórios
     reportBtn: document.getElementById('report-btn'),
     managerAccessBtn: document.getElementById('manager-access-btn'),
     returnToManagerBtn: document.getElementById('return-to-manager-btn'),
     changePasswordBtn: document.getElementById('change-password-btn'),
 
-    // Elementos do Toast (Notificação)
+    // Meu Toast (Notificação)
     toast: document.getElementById('toast'),
 
-    // Elementos do Modal de Ticket
+    // Meu Modal de Ticket
     ticketModal: document.getElementById('ticket-modal'),
     ticketContent: document.getElementById('ticket-content'),
     closeTicketBtn: document.getElementById('close-ticket-modal-btn'),
     ticketPrintBtn: document.getElementById('ticket-print-btn'),
     ticketWhatsappBtn: document.getElementById('ticket-whatsapp-btn'),
 
-    // Elementos do Modal de Lembrete
+    // Meu Modal de Lembrete
     reminder: {
         modal: document.getElementById('reminder-modal'),
         date: document.getElementById('reminder-date'),
@@ -88,7 +88,7 @@ export const dom = {
         printBtn: document.getElementById('reminder-print-btn'),
     },
     
-    // Elementos do Modal de Confirmação Personalizado
+    // Meu Modal de Confirmação Personalizado
     customConfirmModal: document.getElementById('custom-confirm-modal'),
     confirmModalTitle: document.getElementById('confirm-modal-title'),
     confirmModalMessage: document.getElementById('confirm-modal-message'),
@@ -98,7 +98,7 @@ export const dom = {
     confirmModalInputUser: document.getElementById('confirm-modal-input-user'),
     confirmModalInputPass: document.getElementById('confirm-modal-input-pass'),
 
-    // Elementos do Modal de Relatório do Funcionário
+    // Meu Modal de Relatório do Funcionário
     employeeReport: {
         modal: document.getElementById('employee-report-modal'),
         closeBtn: document.getElementById('employee-report-close-btn'),
@@ -122,7 +122,7 @@ export const dom = {
         totalSalgadosProducao: document.getElementById('total-salgados-producao'),
     },
     
-    // Elementos do Modal de WhatsApp
+    // Meu Modal de WhatsApp
     whatsapp: {
         modal: document.getElementById('whatsapp-modal'),
         clientName: document.getElementById('whatsapp-client-name'),
@@ -131,7 +131,7 @@ export const dom = {
         cancelBtn: document.getElementById('whatsapp-modal-cancel'),
     },
 
-    // Elementos do Painel do Gerente
+    // Meu Painel do Gerente
     manager: {
         sidebar: document.getElementById('manager-sidebar'),
         menuBtn: document.getElementById('manager-menu-btn'),
@@ -140,40 +140,7 @@ export const dom = {
         pageSubtitle: document.getElementById('page-subtitle'),
         goToPdvBtn: document.getElementById('go-to-pdv-btn'),
         
-        // Dashboard
-        dashVendidoHoje: document.getElementById('dash-vendido-hoje'),
-        dashAReceber: document.getElementById('dash-a-receber'),
-        dashFaturamentoMes: document.getElementById('dash-faturamento-mes'),
-        dashTicketMedio: document.getElementById('dash-ticket-medio'),
-        dashPedidosHoje: document.getElementById('dash-pedidos-hoje'),
-        dashPedidosPendentes: document.getElementById('dash-pedidos-pendentes'),
-        dashNovosClientes: document.getElementById('dash-novos-clientes'),
-        dashPedidosMes: document.getElementById('dash-pedidos-mes'),
-        dashTotalClientes: document.getElementById('dash-total-clientes'),
-        dashMetaProgresso: document.getElementById('dash-meta-progresso'),
-        dashMetaProgressbar: document.getElementById('dash-meta-progressbar'),
-        dashMetaValor: document.getElementById('dash-meta-valor'),
-        dashMetaRestante: document.getElementById('dash-meta-restante'),
-        cardapioMaisVendido: document.getElementById('cardapio-mais-vendido'),
-        cardapioMenosVendido: document.getElementById('cardapio-menos-vendido'),
-        cardapioQtdVendidaHoje: document.getElementById('cardapio-qtd-vendida-hoje'),
-        cardapioQtdVendidaMes: document.getElementById('cardapio-qtd-vendida-mes'),
-        dashBestDay: document.getElementById('dash-best-day'),
-        dashWorstDay: document.getElementById('dash-worst-day'),
-        dashWeeklyTotal: document.getElementById('dash-weekly-total'),
-        dashLowStockCard: document.getElementById('dash-low-stock-card'),
-        dashLowStockCount: document.getElementById('dash-low-stock-count'),
-        dashLowStockList: document.getElementById('dash-low-stock-list'),
-
-        // Análise com IA
-        aiAnalysis: {
-            generateBtn: document.getElementById('generate-ai-analysis-btn'),
-            loader: document.getElementById('ai-analysis-loader'),
-            placeholder: document.getElementById('ai-analysis-placeholder'),
-            result: document.getElementById('ai-analysis-result'),
-        },
-        
-        // Pedidos
+        // Seção: Pedidos
         filterSearchAll: document.getElementById('filter-search-all'),
         clearFiltersBtn: document.getElementById('clear-filters-btn'),
         ordersTableBody: document.getElementById('manager-orders-table-body'),
@@ -183,19 +150,8 @@ export const dom = {
         detailCloseBtn: document.getElementById('detail-close-btn'),
         detailReactivateBtn: document.getElementById('detail-reactivate-btn'),
         detailReleaseEditBtn: document.getElementById('detail-release-edit-btn'),
-        
-        // Relatórios
-        tabRelFinanceiro: document.getElementById('tab-rel-financeiro'),
-        tabRelProdutos: document.getElementById('tab-rel-produtos'),
-        tabRelMargem: document.getElementById('tab-rel-margem'),
-        contentRelFinanceiro: document.getElementById('content-rel-financeiro'),
-        contentRelProdutos: document.getElementById('content-rel-produtos'),
-        contentRelMargem: document.getElementById('content-rel-margem'),
-        profitMarginProductSelect: document.getElementById('profit-margin-product-select'),
-        profitMarginChartContainer: document.getElementById('profit-margin-chart-container'),
-        profitMarginPlaceholder: document.getElementById('profit-margin-placeholder'),
 
-        // Cardápio
+        // Seção: Cardápio
         tabCardapioAssadosManager: document.getElementById('tab-cardapio-assados-manager'),
         tabCardapioFritosManager: document.getElementById('tab-cardapio-fritos-manager'),
         tabCardapioRevendaManager: document.getElementById('tab-cardapio-revenda-manager'),
@@ -204,7 +160,7 @@ export const dom = {
         addProductBtn: document.getElementById('manager-add-product-btn'),
         saveProductsBtn: document.getElementById('manager-save-products-btn'),
         
-        // Estoque
+        // Seção: Estoque
         stockManagementTableBody: document.getElementById('stock-management-table-body'),
         tabStockRepo: document.getElementById('tab-stock-repo'),
         tabStockHistory: document.getElementById('tab-stock-history'),
@@ -213,7 +169,7 @@ export const dom = {
         stockHistoryTableBody: document.getElementById('stock-history-table-body'),
         stockHistoryFilter: document.getElementById('stock-history-filter'),
 
-        // Clientes
+        // Seção: Clientes
         clientsTableBody: document.getElementById('manager-clients-table-body'),
         selectAllClientsCheckbox: document.getElementById('select-all-clients-checkbox'),
         whatsappGroupSender: document.getElementById('whatsapp-group-sender'),
@@ -221,7 +177,7 @@ export const dom = {
         whatsappGroupMessage: document.getElementById('whatsapp-group-message'),
         sendGroupWhatsappBtn: document.getElementById('send-group-whatsapp-btn'),
         
-        // Equipe
+        // Seção: Equipe
         tabEquipeDiario: document.getElementById('tab-equipe-diario'),
         tabEquipeMensal: document.getElementById('tab-equipe-mensal'),
         contentEquipeDiario: document.getElementById('content-equipe-diario'),
@@ -238,7 +194,7 @@ export const dom = {
         addEmployeeBtn: document.getElementById('add-employee-btn'),
         employeeListTableBody: document.getElementById('employee-list-table-body'),
         
-        // Impressão
+        // Seção: Impressão
         storeNameInput: document.getElementById('manager-store-name'),
         storePhoneInput: document.getElementById('manager-store-phone'),
         ticketTitleInput: document.getElementById('manager-ticket-title'),
@@ -248,7 +204,7 @@ export const dom = {
         saveTicketBtn: document.getElementById('manager-save-ticket-btn'),
         ticketPreviewContainer: document.getElementById('ticket-preview-container'),
         
-        // Sistema
+        // Seção: Sistema
         monthlyGoalInput: document.getElementById('manager-monthly-goal'),
         saveGoalBtn: document.getElementById('manager-save-goal-btn'),
         changePassNew: document.getElementById('manager-change-pass-new'),
@@ -262,7 +218,7 @@ export const dom = {
         saveNewPassBtn: document.getElementById('save-new-pass-btn'),
     },
     
-    // NOVO: Notificações
+    // Minhas Notificações
     notifications: {
         bellBtn: document.getElementById('notification-bell-btn'),
         countBadge: document.getElementById('notification-count'),
@@ -272,14 +228,14 @@ export const dom = {
         placeholder: document.getElementById('no-notifications-placeholder'),
     },
 
-    // NOVO: Sugestões da IA no PDV
+    // Minhas Sugestões da IA no PDV
     pdvAiSuggestions: {
         container: document.getElementById('pdv-ai-suggestions'),
         text: document.getElementById('pdv-ai-suggestion-text'),
         loader: document.getElementById('pdv-ai-suggestion-loader'),
     },
 
-    // NOVO: Selo do Cliente
+    // Meu Selo do Cliente
     clientSeal: {
         container: document.getElementById('client-seal-container'),
         orderCount: document.getElementById('seal-order-count'),
@@ -289,7 +245,7 @@ export const dom = {
     },
     clientHistoryHeading: document.getElementById('client-history-heading'),
 
-    // NOVO: Modal de Alterar Senha do Funcionário
+    // Meu Modal de Alterar Senha do Funcionário
     changePasswordModal: {
         modal: document.getElementById('change-password-modal'),
         currentPassInput: document.getElementById('current-password-input'),
@@ -298,21 +254,21 @@ export const dom = {
         saveBtn: document.getElementById('change-password-save-btn'),
         cancelBtn: document.getElementById('change-password-cancel-btn'),
     },
-    // NOVO: Modal de Histórico de Pedidos do Cliente
+    // Meu Modal de Histórico de Pedidos do Cliente
     clientHistoryModal: {
         modal: document.getElementById('client-history-modal'),
         clientName: document.getElementById('client-history-client-name'),
         ordersList: document.getElementById('client-history-orders-list'),
         closeBtn: document.getElementById('client-history-close-btn'),
     },
-    // NOVO: Modal de Histórico de Preços
+    // Meu Modal de Histórico de Preços
     priceHistoryModal: {
         modal: document.getElementById('price-history-modal'),
         productName: document.getElementById('history-product-name'),
         tableBody: document.getElementById('price-history-table-body'),
         closeBtn: document.getElementById('price-history-close-btn'),
     },
-    // NOVO: Modal Seletor de Horário Interativo
+    // Meu Modal Seletor de Horário Interativo
     interactiveTimeSelector: {
         modal: document.getElementById('interactive-time-selector-modal'),
         container: document.getElementById('time-slots-container'),
@@ -323,14 +279,14 @@ export const dom = {
         confirmManualBtn: document.getElementById('confirm-manual-time-btn'),
         closeBtn: document.getElementById('interactive-time-selector-close-btn'),
     },
-    // NOVO: Modal de aviso de sobrecarga
+    // Meu Modal de aviso de sobrecarga
     overloadWarningModal: {
         modal: document.getElementById('overload-warning-modal'),
         message: document.getElementById('overload-warning-message'),
         changeTimeBtn: document.getElementById('overload-change-time-btn'),
         continueAnywayBtn: document.getElementById('overload-continue-anyway-btn'),
     },
-    // NOVO: Central de Alertas de Pedidos Expirados
+    // Minha Central de Alertas de Pedidos Expirados
     alerts: {
         openBtn: document.getElementById('open-alerts-btn'),
         badge: document.getElementById('alert-count-badge'),

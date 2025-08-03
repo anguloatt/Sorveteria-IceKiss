@@ -1,23 +1,19 @@
-// pdv-live-summary.js - Módulo para atualizar o painel de resumo do pedido em tempo real.
-
 import { formatCurrency, getProductInfoById } from './utils.js';
 
-// Referências aos elementos do DOM para evitar múltiplas buscas
 const liveOrderItemsContainer = document.getElementById('live-order-items');
 const liveOrderTotalEl = document.getElementById('live-order-total');
 const liveOrderPlaceholder = document.getElementById('live-order-placeholder');
 
 /**
- * Renderiza um único item no painel de resumo.
- * @param {object} item - O item do pedido.
- * @returns {HTMLDivElement} O elemento div do item.
+ * Para cada item do pedido, eu crio e retorno o elemento HTML
+ * que será exibido no painel de resumo.
+ * @param {object} item - O objeto do item do pedido que vou processar.
+ * @returns {HTMLDivElement} O elemento div do item, pronto para ser exibido.
  */
 function createLiveOrderItemElement(item) {
     const itemEl = document.createElement('div');
-    // Usa a classe de estilo definida no style.css e adiciona uma classe para animação
     itemEl.className = 'live-order-item animate-fade-in';
 
-    // Obtém o nome do produto, seja ele manual ou do cardápio
     const productName = item.isManual ? item.name : getProductInfoById(item.id)?.name || 'Produto não encontrado';
 
     itemEl.innerHTML = `
@@ -30,9 +26,10 @@ function createLiveOrderItemElement(item) {
 }
 
 /**
- * Atualiza o painel de resumo do pedido com os dados mais recentes.
- * Esta função é exportada para ser chamada de outros módulos (como o pdv.js) sempre que o pedido for alterado.
- * @param {object} order - O objeto do pedido atual.
+ * Esta é a minha função principal para atualizar o painel de resumo.
+ * Eu a exporto para que outros módulos (como o pdv.js) possam chamá-la
+ * sempre que o pedido mudar.
+ * @param {object} order - O objeto do pedido atual que uso para atualizar a tela.
  */
 export function updateLiveSummary(order) {
     if (!liveOrderItemsContainer || !liveOrderTotalEl || !liveOrderPlaceholder) return;
@@ -46,29 +43,20 @@ export function updateLiveSummary(order) {
         liveOrderItemsContainer.appendChild(createLiveOrderItemElement(item));
     });
 
-    // ALTERAÇÃO: Em vez de mostrar o total em R$, mostra a contagem de salgados.
-    const totalSalgados = (items || []).reduce((acc, item) => {
-        // A contagem de "salgados" inclui fritos, assados e itens de revenda,
-        // para refletir o volume total do pedido.
+    // Aqui, em vez de mostrar o total em R$, eu calculo e exibo a contagem total de salgados.
+    const totalSalgados = items.reduce((acc, item) => {
+        // Para a contagem de "salgados", considero fritos, assados e também os de revenda.
         if (item.category === 'fritos' || item.category === 'assados' || item.category === 'revenda') {
             return acc + (item.quantity || 0);
         }
         return acc;
     }, 0);
 
-    // Altera o rótulo e o valor
-    const labelEl = liveOrderTotalEl.previousElementSibling;
-    if (labelEl) {
-        labelEl.textContent = 'Total de Salgados:';
-    }
     liveOrderTotalEl.textContent = totalSalgados;
 
-    // NOVO: Adiciona a lógica de cor condicional para o total de salgados.
-    if (totalSalgados > 100) {
-        liveOrderTotalEl.classList.remove('text-gray-800');
-        liveOrderTotalEl.classList.add('text-red-600', 'animate-pulse'); // Adiciona um pulso para chamar atenção
-    } else {
-        liveOrderTotalEl.classList.remove('text-red-600', 'animate-pulse');
-        liveOrderTotalEl.classList.add('text-gray-800');
-    }
+    // Lógica para destacar o total de salgados se passar de 100.
+    const isOverloaded = totalSalgados > 100;
+    liveOrderTotalEl.classList.toggle('text-red-600', isOverloaded);
+    liveOrderTotalEl.classList.toggle('animate-pulse', isOverloaded);
+    liveOrderTotalEl.classList.toggle('text-gray-800', !isOverloaded);
 }

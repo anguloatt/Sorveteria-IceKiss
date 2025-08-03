@@ -20,12 +20,13 @@ import {
     currentUser, currentOrder, productsConfig, storeSettings, getNextOrderNumber, peekNextOrderNumber, employees, setCurrentUser,
     managerCredentials, masterCredentials, currentReminderOrders
 } from './app.js'; // Importa variáveis globais do app.js
-import {
-    saveOrder as firebaseSaveOrder, updateOrder as firebaseUpdateOrder,
-    cancelOrder as firebaseCancelOrder, settleDebt as firebaseSettleDebt, logUserActivity,
-    findOrder as firebaseFindOrder, updateBackupCSV, checkForDailyDeliveries, createNotification, findLastOrder, serverTimestamp,
+import { 
+    saveOrder as firebaseSaveOrder, updateOrder as firebaseUpdateOrder, 
+    cancelOrder as firebaseCancelOrder, settleDebt as firebaseSettleDebt, logUserActivity, 
+    findOrder as firebaseFindOrder, checkForDailyDeliveries, createNotification, findLastOrder, serverTimestamp, 
     findNextOrder as firebaseFindNextOrder, findPreviousOrder as firebaseFindPreviousOrder, changeEmployeePassword, findClientByPhone, findClientByName,
-    updateProductStock
+    updateProductStock,
+    upsertClientOnOrder
 } from './firebaseService.js'; // Importa funções de serviço Firebase
 
 // Importa funções do gerente que podem ser chamadas do PDV
@@ -42,6 +43,8 @@ import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 let pdvCurrentOrder = null;
 // NOVO: Timer para o debounce da sugestão da IA, para evitar chamadas excessivas.
 let suggestionDebounceTimer = null;
+// NOVO: Timer para o debounce da busca de cliente, para evitar erro 429.
+let clientLookupDebounceTimer = null;
 
 // Renderiza os produtos no PDV com o novo layout de colunas
 export function renderProducts() {
@@ -133,6 +136,64 @@ function renderManualItemToDisplay(item) {
     }
 }
 
+/**
+ * NOVO: Função debounced para buscar dados do cliente e gerar sugestões de IA.
+ * É acionada após o usuário parar de digitar no nome ou telefone para evitar
+ * chamadas de API excessivas e o erro 429 (Too Many Requests).
+ */
+const debouncedClientLookup = () => {
+    clearTimeout(clientLookupDebounceTimer);
+    clientLookupDebounceTimer = setTimeout(async () => {
+        const name = dom.customerName.value.trim();
+         // Se o nome for muito curto, esconde o selo e a sugestão
+        if (name.length < 3 && dom.customerPhone.value.length < 10) {
+            hideClientSeal();
+            if (dom.pdvAiSuggestions?.container)
+             dom.pdvAiSuggestions.container.classList.add('hidden');
+            return;
+        }
+        const phone = dom.customerPhone.value.trim();
+        const rawPhone = phone.replace(/\D/g, '');
+
+        // Prioriza a busca por telefone se ele for válido (10 ou 11 dígitos)
+        if (rawPhone.length >= 10) {
+            const clientData = await findClientByPhone(phone);
+            if (clientData) {
+                // Cliente encontrado: preenche o nome, exibe o selo e verifica dívidas.
+                if (!dom.customerName.value.trim()) {
+                    dom.customerName.value = formatNameToTitleCase(clientData.name);
+                }
+                displayClientSeal(clientData);
+                checkExpiredDebtAndAlert(clientData);
+            } else {
+                // Telefone válido, mas cliente não encontrado: esconde o selo e sugere IA.
+                hideClientSeal();
+                generatePdvAISuggestion(null);
+            }
+        } else if (name.length >= 3) {
+            // Se o telefone não for válido, tenta buscar pelo nome
+            const clientData = await findClientByName(name);
+            if (clientData) {
+                // Cliente encontrado: preenche o telefone, exibe o selo e verifica dívidas.
+                if (!dom.customerPhone.value.trim()) {
+                    dom.customerPhone.value = clientData.phone || '';
+                    formatPhone({ target: dom.customerPhone });
+                }
+                displayClientSeal(clientData);
+                checkExpiredDebtAndAlert(clientData);
+            } else {
+                // Nome válido, mas cliente não encontrado: esconde o selo e sugere IA.
+                hideClientSeal();
+                generatePdvAISuggestion(null);
+            }
+        } else {
+            // Nenhum campo é válido o suficiente para uma busca. Limpa o estado.
+            hideClientSeal();
+            // Garante que a caixa de sugestão da IA seja escondida se nem o nome nem o telefone forem válidos para uma busca.
+            if (dom.pdvAiSuggestions?.container) dom.pdvAiSuggestions.container.classList.add('hidden');
+        }
+    }, 750); // Atraso de 750ms para esperar o usuário parar de digitar.
+};
 // Função para remover um item manual da interface e do pdvCurrentOrder
 function removeManualItem(itemId) {
     if (!pdvCurrentOrder || !pdvCurrentOrder.items) return;
@@ -183,6 +244,24 @@ async function clearCart() {
     console.log("clearCart: Carrinho limpo.");
 }
 
+/**
+ * Atualiza o estilo visual dos inputs de quantidade no cardápio.
+ * Destaca os inputs que têm uma quantidade maior que zero.
+ */
+function updateQuantityInputStyles() {
+    document.querySelectorAll('#pdv-cardapio-grid .product-quantity').forEach(input => {
+        const quantity = parseInt(input.value, 10) || 0;
+        const isHighlighted = quantity > 0;
+
+        // Usa toggle para adicionar/remover classes de forma mais limpa
+        input.classList.toggle('bg-yellow-100', isHighlighted);
+        input.classList.toggle('border-2', isHighlighted);
+        input.classList.toggle('border-amber-500', isHighlighted);
+        input.classList.toggle('font-bold', isHighlighted);
+        input.classList.toggle('text-amber-700', isHighlighted);
+    });
+}
+
 // Calcula os totais do pedido
 export function calculateTotals() {
     let total = 0;
@@ -191,15 +270,6 @@ export function calculateTotals() {
         const quantityInput = el.querySelector('.product-quantity');
         if (quantityInput && !quantityInput.disabled) {
             let quantity = parseInt(quantityInput.value) || 0;
-
-            // NOVO: Adiciona ou remove as classes de destaque com base na quantidade
-            if (quantity > 0) {
-                // Adiciona classes do Tailwind para destacar o campo
-                quantityInput.classList.add('bg-yellow-100', 'border-2', 'border-amber-500', 'font-bold', 'text-amber-700');
-            } else {
-                // Remove as classes de destaque se a quantidade for zero
-                quantityInput.classList.remove('bg-yellow-100', 'border-2', 'border-amber-500', 'font-bold', 'text-amber-700');
-            }
 
             if (quantity > 0) {
                 const id = el.dataset.productId;
@@ -211,12 +281,12 @@ export function calculateTotals() {
                 }
 
                 if (product) {
-                    // VERIFICAÇÃO DE ESTOQUE
-                    if (typeof product.stock === 'number' && quantity > product.stock) {
-                        showToast(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`, 'error');
-                        quantity = product.stock; // Corrige a quantidade para o máximo disponível
-                        quantityInput.value = quantity; // Atualiza o campo na tela
-                    }
+                    // // VERIFICAÇÃO DE ESTOQUE (Temporariamente desativada conforme solicitado)
+                    // if (typeof product.stock === 'number' && quantity > product.stock) {
+                    //     showToast(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}`, 'error');
+                    //     quantity = product.stock; // Corrige a quantidade para o máximo disponível
+                    //     quantityInput.value = quantity; // Atualiza o campo na tela
+                    // }
 
                     if (quantity > 0) { // Re-verifica a quantidade após a correção
                         const price = product.price;
@@ -230,7 +300,9 @@ export function calculateTotals() {
                             unitPrice: price,
                             subtotal, // subtotal agora está arredondado
                             category: category,
-                            stock: product.stock // Passa a informação de estoque junto
+                            // AÇÃO CORRETIVA: Garante que o valor de 'stock' não seja 'undefined'.
+                            // O Firestore não permite valores 'undefined', o que causava erro ao salvar.
+                            stock: product.stock ?? null // Se product.stock for undefined ou null, usa null.
                         });
                     }
                 }
@@ -271,6 +343,9 @@ export function calculateTotals() {
     if (timeSelectorModal && timeSelectorModal.classList.contains('active')) {
         openInteractiveTimeSelector();
     }
+
+    // NOVO: Centraliza a atualização de estilos dos inputs de quantidade
+    updateQuantityInputStyles();
 
     // NOVO: Chama a atualização do painel de resumo sempre que os totais são recalculados
     updateLiveSummary(pdvCurrentOrder);
@@ -477,8 +552,17 @@ async function _executeSaveOrder() {
     // CORREÇÃO DE SEGURANÇA: Pega o operador do seletor, em vez de usar o usuário logado.
     // Isso garante que a venda seja atribuída corretamente, sem alterar o usuário autenticado.
     const operatorName = dom.employeeSwitcherSelect.value;
-    const operator = employees.find(e => e.name === operatorName) || currentUser;
+    let operator = employees.find(e => e.name === operatorName);
 
+    // AÇÃO CORRETIVA: Se o operador não for encontrado na lista (ex: "Gerência"),
+    // usa o currentUser, mas garante que ele tenha um ID. O usuário 'gerente' não
+    // vem da coleção 'employees', então seu ID não existe por padrão.
+    if (!operator) {
+        operator = {
+            ...currentUser,
+            id: currentUser.id || 'gerencia_user' // Garante um ID para o gerente
+        };
+    }
     const roundedSinal = roundSinal(parseCurrency(dom.sinal.value));
     pdvCurrentOrder.sinal = roundedSinal;
     pdvCurrentOrder.restante = pdvCurrentOrder.total - roundedSinal;
@@ -495,6 +579,8 @@ async function _executeSaveOrder() {
 
     const orderData = {
         ...pdvCurrentOrder,
+        // CORREÇÃO CRÍTICA: Garante que o número do pedido seja salvo como NÚMERO, não como texto.
+        orderNumber: parseInt(pdvCurrentOrder.orderNumber, 10),
         status: 'ativo',
         // CORREÇÃO: Salva o telefone exatamente como está no campo (já formatado por formatPhone)
         customer: { name: dom.customerName.value, phone: dom.customerPhone.value }, 
@@ -509,11 +595,11 @@ async function _executeSaveOrder() {
         // Passo 1: Salva o pedido no banco de dados
         const savedOrder = await firebaseSaveOrder(orderData);
         
-        // Passo 2: Dá baixa no estoque para cada item do pedido
-        showToast("Dando baixa no estoque...", "info", 2000);
-        for (const item of savedOrder.items) {
-            await updateProductStock(item.id, -item.quantity, 'Venda', savedOrder.orderNumber);
-        }
+        // Passo 2: Dá baixa no estoque para cada item do pedido (Temporariamente desativado)
+        // showToast("Dando baixa no estoque...", "info", 2000);
+        // for (const item of savedOrder.items) {
+        //     await updateProductStock(item.id, -item.quantity, 'Venda', savedOrder.orderNumber);
+        // }
 
         // Passo 3: Atualiza/Cria o cliente
         await upsertClientOnOrder(savedOrder, true);
@@ -527,12 +613,25 @@ async function _executeSaveOrder() {
         );
 
         // Passo 4: Mostra o ticket e inicia um novo pedido
-        pdvCurrentOrder = savedOrder;
-        showTicketModal(pdvCurrentOrder);
+        // CORREÇÃO: O objeto 'savedOrder' contém um 'serverTimestamp' que não pode ser formatado.
+        // Criamos uma versão para exibição com a data atual do cliente.
+        const orderForDisplay = { ...savedOrder, createdAt: new Date() };
+        pdvCurrentOrder = orderForDisplay;
+        showTicketModal(orderForDisplay);
         startNewOrder();
         console.log("saveOrder: Pedido finalizado com sucesso.");
     } catch (error) {
         console.error("saveOrder: Erro ao finalizar pedido:", error);
+        // NOVO: Tratamento de erro específico para estoque insuficiente.
+        // Isso acontece se o estoque acabar enquanto o pedido está sendo feito (condição de corrida).
+        if (error.message && error.message.includes("Estoque insuficiente")) {
+            showToast(error.message, "error", 5000); // Mostra a mensagem de erro exata do sistema.
+            showToast("O estoque foi atualizado. Verifique as quantidades e tente novamente.", "info", 6000);
+            renderProducts(); // Re-renderiza a lista de produtos para mostrar o estoque atualizado (desabilitando itens sem estoque).
+        } else {
+            // Tratamento para outros erros inesperados.
+            showToast("Ocorreu um erro inesperado ao salvar o pedido.", "error");
+        }
     }
 }
 
@@ -584,8 +683,17 @@ async function _executeupdateOrder() {
     // CORREÇÃO DE SEGURANÇA: Pega o operador do seletor para o campo 'updatedBy'.
     // Isso garante que a alteração seja atribuída corretamente, sem usar o usuário autenticado.
     const operatorName = dom.employeeSwitcherSelect.value;
-    const operator = employees.find(e => e.name === operatorName) || currentUser;
+    let operator = employees.find(e => e.name === operatorName);
 
+    // AÇÃO CORRETIVA: Se o operador não for encontrado na lista (ex: "Gerência"),
+    // usa o currentUser, mas garante que ele tenha um ID. O usuário 'gerente' não
+    // vem da coleção 'employees', então seu ID não existe por padrão.
+    if (!operator) {
+        operator = {
+            ...currentUser,
+            id: currentUser.id || 'gerencia_user' // Garante um ID para o gerente
+        };
+    }
     const roundedSinal = roundSinal(parseCurrency(dom.sinal.value));
     pdvCurrentOrder.sinal = roundedSinal;
     pdvCurrentOrder.restante = pdvCurrentOrder.total - roundedSinal;
@@ -620,9 +728,12 @@ async function _executeupdateOrder() {
     console.log("updateOrder: Dados do pedido a serem atualizados:", orderData);
     try {
         await firebaseUpdateOrder(pdvCurrentOrder.id, orderData);
-        pdvCurrentOrder = orderData;
+        // CORREÇÃO: O objeto 'orderData' contém um 'serverTimestamp' que não pode ser formatado.
+        // Criamos uma versão para exibição com a data atual do cliente.
+        const orderForDisplay = { ...orderData, updatedAt: new Date() };
+        pdvCurrentOrder = orderForDisplay;
         updateStatusLabel('alterado', 'Pedido Alterado');
-        showTicketModal(pdvCurrentOrder);
+        showTicketModal(orderForDisplay);
         console.log("updateOrder: Pedido atualizado com sucesso.");
     } catch (error) {
         console.error("updateOrder: Erro ao atualizar:", error);
@@ -642,17 +753,16 @@ async function cancelOrder() {
         // Passo 1: Cancela o pedido no banco de dados
         await firebaseCancelOrder(pdvCurrentOrder.id, currentUser, pdvCurrentOrder.orderNumber);
         
-        // Passo 2: Devolve os itens ao estoque
-        showToast("Devolvendo itens ao estoque...", "info", 2000);
-        for (const item of pdvCurrentOrder.items) {
-            await updateProductStock(item.id, item.quantity, 'Cancelamento', pdvCurrentOrder.orderNumber);
-        }
+        // // Passo 2: Devolve os itens ao estoque (Temporariamente desativado)
+        // showToast("Devolvendo itens ao estoque...", "info", 2000);
+        // for (const item of pdvCurrentOrder.items) {
+        //     await updateProductStock(item.id, item.quantity, 'Cancelamento', pdvCurrentOrder.orderNumber);
+        // }
 
         // Passo 3: Atualiza a interface e o backup
         pdvCurrentOrder.status = 'cancelado';
         updateStatusLabel('cancelado', 'Cancelado');
-        await updateBackupCSV(pdvCurrentOrder);
-        showToast(`Pedido ${pdvCurrentOrder.orderNumber} cancelado e estoque devolvido.`, "success");
+        showToast(`Pedido ${pdvCurrentOrder.orderNumber} cancelado.`, "success"); // Mensagem ajustada
         console.log("cancelOrder: Pedido cancelado com sucesso.");
     } catch (error) {
         console.error("cancelOrder: Erro ao cancelar:", error);
@@ -679,7 +789,6 @@ async function settleDebt() {
             dom.sinal.value = formatCurrency(newSinal).replace('R$ ', '');
         }
         calculateTotals();
-        await updateBackupCSV(pdvCurrentOrder);
         console.log("settleDebt: Saldo liquidado com sucesso.");
     } catch (error) {
         console.error("settleDebt: Erro ao liquidar:", error);
@@ -761,6 +870,31 @@ function clearForm() {
     hideClientSeal();
     console.log("clearForm: Formulário limpo.");
 }
+/**
+ * Valida o nome do cliente.
+ * @param {string} nameValue - O valor do campo de nome.
+ * @returns {{field: HTMLElement, message: string}|null} Retorna um objeto de erro se inválido, senão null.
+ */
+function validateCustomerName(nameValue) {
+    const nameParts = nameValue.trim().split(' ');
+    if (nameParts.length < 2 || nameParts.some(part => part === '') || nameValue.trim().length < 3) {
+        return { field: dom.customerName, message: "Por favor, insira o nome e sobrenome do cliente." };
+    }
+    return null;
+}
+
+/**
+ * Valida o telefone do cliente.
+ * @param {string} phoneValue - O valor do campo de telefone.
+ * @returns {{field: HTMLElement, message: string}|null} Retorna um objeto de erro se inválido, senão null.
+ */
+function validateCustomerPhone(phoneValue) {
+    const rawPhone = phoneValue.trim().replace(/\D/g, '');
+    if (rawPhone.length < 10 || rawPhone.length > 11 || !phoneValue.trim().match(/^\(\d{2}\)\s\d{4,5}-\d{4}$/)) {
+        return { field: dom.customerPhone, message: "O telefone deve estar no formato (XX) XXXXX-XXXX." };
+    }
+    return null;
+}
 
 // Valida o formulário do pedido
 function validateForm(isNewOrder) {
@@ -774,40 +908,62 @@ function validateForm(isNewOrder) {
     fieldsToValidate.forEach(field => field?.classList.remove('invalid-field'));
 
     // 1. Validação do Nome do Cliente
-    const nameParts = dom.customerName.value.trim().split(' ');
-    if (nameParts.length < 2 || nameParts.some(part => part === '') || dom.customerName.value.trim().length < 3) {
-        errors.push({ field: dom.customerName, message: "Por favor, insira o nome e sobrenome do cliente." });
+    const nameError = validateCustomerName(dom.customerName.value);
+    if (nameError) {
+        errors.push(nameError);
     }
 
     // 2. Validação do Telefone
-    // A validação agora considera o formato com máscara
-    const phoneValue = dom.customerPhone.value.trim();
-    const rawPhone = phoneValue.replace(/\D/g, '');
-    if (rawPhone.length < 10 || rawPhone.length > 11 || !phoneValue.match(/^\(\d{2}\)\s\d{4,5}-\d{4}$/)) {
-        errors.push({ field: dom.customerPhone, message: "O telefone deve estar no formato (XX) XXXXX-XXXX." });
+    const phoneError = validateCustomerPhone(dom.customerPhone.value);
+    if (phoneError) {
+        errors.push(phoneError);
     }
 
-    // 3. Validação da Data de Retirada
-    if (!dom.deliveryDate.value.trim()) {
-        errors.push({ field: dom.deliveryDate, message: "A data de retirada é obrigatória." });
-    } else {
-        const deliveryDate = new Date(dom.deliveryDate.value + 'T00:00:00');
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Zera a hora para comparar apenas a data
-        if (deliveryDate < today) {
-            errors.push({ field: dom.deliveryDate, message: "A data de retirada não pode ser no passado." });
-        }
-    }
-
-    // 4. Validação da Hora de Retirada
+    // 3. Validação da Data e Hora de Retirada (Lógica unificada e corrigida)
+    const deliveryDateValue = dom.deliveryDate.value.trim(); // "YYYY-MM-DD"
+    const deliveryTimeValue = dom.deliveryTime.value.trim(); // "HH:MM"
     const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    if (!dom.deliveryTime.value.trim()) {
+
+    if (!deliveryDateValue) {
+        errors.push({ field: dom.deliveryDate, message: "A data de retirada é obrigatória." });
+    }
+    if (!deliveryTimeValue) {
         errors.push({ field: dom.deliveryTime, message: "A hora da retirada é obrigatória." });
-    } else if (!timeRegex.test(dom.deliveryTime.value)) {
+    } else if (!timeRegex.test(deliveryTimeValue)) {
         errors.push({ field: dom.deliveryTime, message: "Formato de hora inválido. Use HH:MM." });
     }
 
-    // 5. Validação dos Itens do Pedido
+    // Apenas prossegue para a validação de tempo se a data e a hora tiverem um formato válido
+    if (deliveryDateValue && deliveryTimeValue && timeRegex.test(deliveryTimeValue)) {
+        // --- NOVA LÓGICA DE VALIDAÇÃO USANDO date-fns (MAIS SEGURA E SIMPLES) ---
+
+        // 1. Combina as strings de data e hora para criar uma string completa.
+        const combinedStr = `${deliveryDateValue} ${deliveryTimeValue}`;
+
+        // 2. Usa a função 'parse' do date-fns para criar o objeto Date corretamente no fuso horário local.
+        //    'yyyy-MM-dd HH:mm' informa ao  exatamente como interpretar a string.
+        //    O 'new Date()' é a data de referência, garantindo que a análise seja consistente.
+        const deliveryDateTime = dateFns.parse(combinedStr, 'yyyy-MM-dd HH:mm', new Date());
+        // Correto: 'HH' Essa pequena alteração fará com que 12:00 seja corretamente interpretado como meio-dia, e a sua lógica de validação funcionará como esperado.
+        
+        // 3. Cria a data/hora atual com uma tolerância para evitar erros por segundos.
+        //    Subtrai 5 minutos do tempo atual, então um pedido para "agora" ainda é válido.
+        const nowWithTolerance = dateFns.subMinutes(new Date(), 5);
+
+        // --- LOGS DE DEPURAÇÃO PARA DIAGNÓSTICO ---
+        console.log("--- DEBUG DE HORÁRIO (date-fns) ---");
+        console.log(`String Combinada: ${combinedStr}`);
+        console.log(`Horário Escolhido (Parseado): ${deliveryDateTime.toLocaleString('pt-BR')}`);
+        console.log(`Horário Atual (com tolerância de 5min): ${nowWithTolerance.toLocaleString('pt-BR')}`);
+        console.log("------------------------------------");
+
+        // 4. Compara as datas. 'isBefore' do date-fns é seguro e explícito.
+        if (dateFns.isBefore(deliveryDateTime, nowWithTolerance)) {
+            errors.push({ field: dom.deliveryTime, message: "Este horário já passou. Por favor, escolha um horário futuro." });
+        }
+    }
+
+    // 4. Validação dos Itens do Pedido
     if (!pdvCurrentOrder || pdvCurrentOrder.items.length === 0) {
         errors.push({ message: "Adicione ao menos um item ao pedido." });
     }
@@ -815,9 +971,15 @@ function validateForm(isNewOrder) {
     // Se houver erros, destaca os campos e mostra o primeiro erro
     if (errors.length > 0) {
         console.warn("validateForm: Erros de validação encontrados:", errors);
-        errors.forEach(error => error.field?.classList.add('invalid-field'));
+        errors.forEach(error => {
+            if (error.field) {
+                error.field.classList.add('invalid-field');
+            }
+        });
         showToast(errors[0].message, "error");
-        errors[0].field?.focus();
+        if (errors[0].field) {
+            errors[0].field.focus();
+        }
         return false;
     }
 
@@ -1361,73 +1523,17 @@ export function setupPdvEventListeners() {
         e.target.value = formatCurrency(value).replace('R$ ', '');
         calculateTotals();
     });
-    dom.customerName.addEventListener("blur", async (e) => { // Adicionado 'async'
-        const name = formatNameToTitleCase(e.target.value);
-        e.target.value = name; // Atualiza o campo com o nome formatado
-
-        // Se o nome for muito curto, esconde o selo e a sugestão
-        if (name.length < 3) {
-            hideClientSeal();
-            if (dom.pdvAiSuggestions?.container) {
-                dom.pdvAiSuggestions.container.classList.add('hidden');
-            }
-            return;
-        }
-
-        // Tenta encontrar o cliente pelo nome
-        const clientData = await findClientByName(name); // NOVO: Chama findClientByName
-        if (clientData) {
-            // Cliente encontrado, preenche o telefone se estiver vazio e exibe o selo
-            if (!dom.customerPhone.value.trim()) {
-                dom.customerPhone.value = clientData.phone || ''; // Atribui o valor diretamente
-                formatPhone({ target: dom.customerPhone }); // Chama formatPhone para formatar
-            }
-            displayClientSeal(clientData); // Exibe o selo e esconde a IA
-            // NOVO: Verificação e alerta para saldo em aberto expirado
-            checkExpiredDebtAndAlert(clientData);
-            // NÃO CHAMA generatePdvAISuggestion AQUI se o cliente foi encontrado,
-            // para que o selo permaneça visível.
-        } else {
-            // Cliente não encontrado, esconde o selo e gera sugestão para novo cliente
-            hideClientSeal(); // Esconde o selo
-            generatePdvAISuggestion(null); // Exibe a IA (com sugestão ou indisponibilidade)
-        }
+    // AÇÃO CORRETIVA: Substitui os listeners de 'blur' por 'input' e usa a função
+    // debounced para evitar chamadas excessivas à API e o erro 429.
+    dom.customerName.addEventListener("input", debouncedClientLookup);
+    dom.customerName.addEventListener("blur", (e) => {
+        // Mantém a formatação do nome ao sair do campo.
+        e.target.value = formatNameToTitleCase(e.target.value);
     });
 
-    dom.customerPhone.addEventListener("input", formatPhone);
-    dom.customerPhone.addEventListener("blur", async (e) => {
-        const phone = e.target.value; // Pega o telefone como está no campo (já formatado)
-        // Esconde o selo se o telefone for curto (após remover não-dígitos para validação)
-        if (phone.replace(/\D/g, '').length < 10) {
-            hideClientSeal();
-            // AJUSTE: Limpa o campo de nome se o telefone for muito curto ou removido
-            dom.customerName.value = '';
-            // NOVO: Esconde a sugestão da IA se o telefone for limpo ou inválido
-            if (dom.pdvAiSuggestions?.container) {
-                dom.pdvAiSuggestions.container.classList.add('hidden');
-            }
-            return;
-        }
-
-        const clientData = await findClientByPhone(phone); // Passa o telefone formatado para a busca
-        if (clientData) {
-            // Cliente encontrado, preenche o nome se estiver vazio e exibe o selo
-            if (!dom.customerName.value.trim()) {
-                dom.customerName.value = formatNameToTitleCase(clientData.name);
-            }
-            displayClientSeal(clientData); // Exibe o selo e esconde a IA
-            // NOVO: Verificação e alerta para saldo em aberto expirado
-            checkExpiredDebtAndAlert(clientData);
-            // NÃO CHAMA generatePdvAISuggestion AQUI se o cliente foi encontrado,
-            // para que o selo permaneça visível.
-        } else {
-            // Cliente não encontrado, esconde o selo
-            hideClientSeal();
-            // AJUSTE: Limpa o campo de nome se o cliente não for encontrado
-            dom.customerName.value = '';
-            // NOVO: Gera uma sugestão de IA para novo cliente
-            generatePdvAISuggestion(null); // Exibe a IA (com sugestão ou indisponibilidade)
-        }
+    dom.customerPhone.addEventListener("input", (e) => {
+        formatPhone(e); // Formata o telefone enquanto o usuário digita.
+        debouncedClientLookup(); // Aciona a busca debounced.
     });
     
     dom.deliveryDate.addEventListener("change", (e) => {
@@ -1457,7 +1563,7 @@ export function setupPdvEventListeners() {
         if (navigateToManagerView) {
             dom.mainContent.style.display = 'none';
             dom.managerDashboard.style.display = 'flex';
-            navigateToManagerView('dashboard');
+            navigateToManagerView('gerencial-dashboard');
         } else {
             console.error("navigateToManagerView não está disponível.");
             showToast("Erro de navegação. Tente recarregar a página.", "error");

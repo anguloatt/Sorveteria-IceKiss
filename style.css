@@ -1,5 +1,29 @@
 /* style.css */
 
+/* Importação da fonte Inter do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Reset básico e estilos gerais */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --bg-light: #f4f7f6;
+    --bg-dark: #2c3e50;
+    --text-light: #f8f9fa;
+    --text-dark: #212529;
+    --card-bg: #ffffff;
+    --border-color: #e9ecef;
+    --sidebar-width: 250px;
+    --header-height: 60px;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
 body { font-family: 'Poppins', sans-serif; } /* Define a fonte padrão para o corpo */
 
 /* Previne o FOUC (Flash of Unstyled Content) escondendo o corpo até que o JS o torne visível */
@@ -917,7 +941,6 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     padding: 0.5rem;
     border-radius: 0.375rem;
     background-color: #f9fafb; /* bg-gray-50 */
-}
 }
 
 /* Estilo para destacar o slot de horário recém-adicionado ou encontrado */

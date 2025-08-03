@@ -1015,7 +1015,7 @@ export async function startApp(userType, user) {
         if (currentUser.role === 'mestra') {
             navigateToManagerView('master-reset');
         } else {
-            navigateToManagerView('dashboard');
+            navigateToManagerView('gerencial-dashboard');
         }
         startNotificationListener(); // Inicia o listener para o gerente
 
@@ -1241,17 +1241,19 @@ function setupTimeSelectorListeners() {
     timeSlotsContainer.addEventListener('click', (e) => {
         const button = e.target.closest('.time-slot-btn');
         if (button && button.dataset.time) {
-            // Verifica se o horário já passou antes de selecionar
-            const dateInput = dom.deliveryDate;
-            const now = new Date();
-            const todayString = getTodayDateString('yyyy-mm-dd');
-            const isToday = dateInput.value === todayString;
-            
-            const [hours, minutes] = button.dataset.time.split(':').map(Number);
-            const slotTime = new Date(dateInput.value);
-            slotTime.setHours(hours, minutes, 0, 0);
+            // --- CORREÇÃO CRÍTICA: Validação de horário expirado ---
+            // A lógica anterior tinha um bug de fuso horário (UTC). Esta nova versão usa
+            // date-fns para uma comparação segura e precisa.
 
-            if (isToday && slotTime < now) {
+            const dateInput = dom.deliveryDate;
+
+            // 1. Constrói a data/hora do slot de forma segura.
+            const combinedStr = `${dateInput.value} ${button.dataset.time}`;
+            const slotDateTime = dateFns.parse(combinedStr, 'yyyy-MM-dd HH:mm', new Date());
+
+            // 2. Compara com o horário atual (com uma pequena tolerância).
+            const nowWithTolerance = dateFns.subMinutes(new Date(), 1);
+            if (dateFns.isBefore(slotDateTime, nowWithTolerance)) {
                 showToast('Este horário já passou e não pode ser selecionado.', 'info');
                 return;
             }
