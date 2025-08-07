@@ -189,19 +189,9 @@ export function parseCurrency(currencyString) {
     if (typeof currencyString !== 'string' || !currencyString) {
         return 0;
     }
-
-    // 1. Remove tudo que não for dígito ou vírgula.
-    // Ex: "R$ 1.234,56" -> "1234,56"
     const cleanedString = currencyString.replace(/[^\d,]/g, '');
-
-    // 2. Troca a vírgula decimal por um ponto para que o parseFloat funcione.
-    // Ex: "1234,56" -> "1234.56"
     const numberString = cleanedString.replace(',', '.');
-
-    // 3. Converte para número.
     const value = parseFloat(numberString);
-
-    // 4. Retorna 0 se o resultado não for um número válido.
     return isNaN(value) ? 0 : value;
 }
 
@@ -265,7 +255,6 @@ export function updateWeekdayDisplay(dateString) {
         return;
     }
     const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-    // CORREÇÃO CRÍTICA: Evita problemas de fuso horário.
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     dom.deliveryDateWeekday.textContent = weekdays[date.getDay()];
@@ -286,17 +275,14 @@ export function formatNameToTitleCase(str) {
  * @param {Event} e O evento de input.
  */
 export function formatPhone(e) {
-    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
-    value = value.substring(0, 11); // Limita a 11 dígitos (DDD + 9 dígitos)
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.substring(0, 11);
 
     if (value.length > 10) {
-        // (XX) XXXXX-XXXX
         value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
     } else if (value.length > 6) {
-        // (XX) XXXX-XXXX
         value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
     } else if (value.length > 2) {
-        // (XX) XXXX
         value = value.replace(/^(\d{2})(\d{0,5}).*/, '($1) $2');
     } else if (value.length > 0) {
         value = `(${value}`;
@@ -310,7 +296,6 @@ export function formatPhone(e) {
  */
 export function formatTime(e) {
     const input = e.target;
-
     let value = input.value.replace(/\D/g, '');
 
     if (value.length >= 2) {
@@ -330,7 +315,6 @@ export function formatTime(e) {
     if (value.length > 2) {
         value = `${value.substring(0, 2)}:${value.substring(2, 4)}`;
     }
-
     input.value = value;
 }
 
@@ -353,12 +337,6 @@ export function getProductInfoById(productId) {
     return null;
 }
 
-/**
- * Função auxiliar para centralizar texto em uma largura específica.
- * @param {string} text O texto a ser centralizado.
- * @param {number} width A largura total desejada.
- * @returns {string} O texto centralizado com espaços.
- */
 export const centerText = (text, width = 40) => {
     const padding = Math.max(0, width - text.length);
     const padLeft = Math.floor(padding / 2);
@@ -366,43 +344,19 @@ export const centerText = (text, width = 40) => {
     return ' '.repeat(padLeft) + text + ' '.repeat(padRight);
 };
 
-/**
- * Função auxiliar para alinhar texto à direita em uma largura específica.
- * @param {string} text O texto a ser alinhado à direita.
- * @param {number} width A largura total desejada.
- * @returns {string} O texto alinhado à direita com espaços.
- */
 export const rightAlignText = (text, width = 40) => {
     return ' '.repeat(Math.max(0, width - text.length)) + text;
 };
 
-/**
- * Função auxiliar para alinhar texto à esquerda em uma largura específica.
- * @param {string} text O texto a ser alinhado à esquerda.
- * @param {number} width A largura total desejada.
- * @returns {string} O texto alinhado à esquerda com espaços.
- */
 export const leftAlignText = (text, width = 40) => {
     return text + ' '.repeat(Math.max(0, width - text.length));
 };
 
-/**
- * Função auxiliar para alinhar duas colunas (esquerda e direita) em uma largura total.
- * @param {string} left O texto da coluna esquerda.
- * @param {string} right O texto da coluna direita.
- * @param {number} width A largura total desejada.
- * @returns {string} As duas colunas alinhadas.
- */
 export const twoColumns = (left, right, width = 40) => {
     const spaceBetween = Math.max(1, width - left.length - right.length);
     return left + ' '.repeat(spaceBetween) + right;
 };
 
-/**
- * GERA O TEXTO FORMATADO PARA IMPRESSÃO/WHATSAPP (FORMATO CUPOM).
- * @param {object} order O objeto do pedido.
- * @returns {string} O texto formatado do ticket.
- */
 export function generateTicketText(order) {
     if (!order || !storeSettings) {
         console.error("Dados do pedido ou configurações da loja não disponíveis para gerar ticket.");
@@ -416,7 +370,7 @@ export function generateTicketText(order) {
     const ticketSubtitle = settings.ticketSubtitle || "(NAO E DOCUMENTO FISCAL)";
     const footerMessage = settings.footerMessage || "Obrigado(a) pela preferência!";
     const printUnitPrice = settings.printUnitPrice || false;
-    const width = 35; // Largura do cupom em caracteres
+    const width = 35;
 
     const separator = "=".repeat(width);
     const thinSeparator = "-".repeat(width);
@@ -497,12 +451,6 @@ export function generateTicketText(order) {
     return text;
 }
 
-
-/**
- * GERA O TEXTO FORMATADO PARA IMPRESSÃO DO LEMBRETE DE PRODUÇÃO (FORMATO CUPOM).
- * @param {Array<object>} orders A lista de pedidos para o lembrete.
- * @returns {string} O texto formatado do lembrete.
- */
 export function generatePrintableReminderText(orders) {
     let text = `========================================\n`;
     text += `${centerText("Lembrete de Producao Diaria", 40)}\n`;
@@ -560,11 +508,6 @@ export function generatePrintableReminderText(orders) {
     return text;
 }
 
-
-/**
- * Imprime o ticket/comprovante de um pedido.
- * @param {object} order O objeto do pedido.
- */
 export function printTicket(order) {
     if (!order || !order.orderNumber) {
         showToast("Pedido inválido para impressão.", "error");
@@ -578,7 +521,6 @@ export function printTicket(order) {
         console.error("printTicket: Janela de impressão bloqueada.");
         return;
     }
-    //font-size: 13px; /* Tamanho da fonte aumentado para melhor leitura */
     printWindow.document.open();
     printWindow.document.write(`
         <!DOCTYPE html>
@@ -617,7 +559,11 @@ export function sendWhatsAppMessage(order) {
 
     const ticketText = generateTicketText(order);
 
-    const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(ticketText)}`;
+    // *** INÍCIO DA CORREÇÃO ***
+    // Troca o link "wa.me" pelo link "api.whatsapp.com" para melhor compatibilidade com desktop.
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=55${phone}&text=${encodeURIComponent(ticketText)}`;
+    // *** FIM DA CORREÇÃO ***
+    
     window.open(whatsappUrl, '_blank');
 }
 
@@ -648,7 +594,7 @@ export function printElement(elementId, title = document.title) {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>\${title}</title>
+            <title>${title}</title>
             <link rel="stylesheet" href="https://cdn.tailwindcss.com/2.2.19/tailwind.min.css">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
             <style>
@@ -694,7 +640,6 @@ export function printReminderList() {
         showToast("Permita pop-ups para imprimir.", "error");
         return;
     }
-    //font-size: 13px; /* Tamanho da fonte aumentado para melhor leitura */
     printWindow.document.open();
     printWindow.document.write(`
         <!DOCTYPE html>
@@ -788,7 +733,7 @@ export function formatClientSince(firstOrderDate) {
 export function getSalgadosCountFromItems(items) {
     if (!items || !Array.isArray(items)) return 0;
     return items.reduce((total, item) => {
-        if (item.category === 'assados' || item.category === 'fritos') {
+        if (item.category === 'assados' || item.category === 'fritos' || item.category === 'revenda') {
             return total + item.quantity;
         }
         return total;
