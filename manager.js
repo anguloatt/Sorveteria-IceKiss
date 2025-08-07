@@ -40,7 +40,8 @@ import {
 // Importo as funções de gerenciamento de funcionários.
 import { loadEmployees, renderEmployeesManagerTab, addEmployee as employeeManagementAddEmployee, editEmployee as employeeManagementEditEmployee, deleteEmployee as employeeManagementDeleteEmployee, resetEmployeePassword, saveProductionSettings } from './employeeManagement.js'; 
 
-import { renderGerencialDashboard } from './manager-realtime.js';
+// Importa a função renderGerencialDashboard e a nova função de HTML da Análise de Clientes
+import { renderGerencialDashboard, createCustomerAnalysisDashboardHTML } from './manager-realtime.js';
 
 // Minhas variáveis locais para este módulo.
 import { createClientGrowthChart, createClientSegmentationChart } from './charts.js';
@@ -1152,7 +1153,6 @@ async function sendGroupWhatsapp() {
 
             if (phone.length >= 10) {
                 sendGroupWhatsappBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Enviando ${i + 1} de ${selectedCheckboxes.length}`;
-                const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
                 window.open(whatsappUrl, '_blank');
                 await delay(3000);
             } else {
@@ -1949,6 +1949,21 @@ async function handleManagerAlertAction(e) {
  */
 export async function populateCustomerAnalysisData() {
     console.log("Iniciando a população da aba de Análise de Clientes.");
+    
+    const customerAnalysisContainer = document.getElementById('content-analise-clientes');
+    if (!customerAnalysisContainer) {
+        console.error("Container da Análise de Clientes (#content-analise-clientes) não encontrado. Não é possível injetar HTML ou popular dados.");
+        // Se o container principal não existe, não há como prosseguir.
+        showToast("Erro: Container da Análise de Clientes não encontrado.", "error");
+        return;
+    }
+
+    // PASSO NOVO E CRÍTICO: Injete o HTML do esqueleto da Análise de Clientes
+    // Isso garante que todos os elementos internos existam ANTES de tentarmos acessá-los.
+    customerAnalysisContainer.innerHTML = createCustomerAnalysisDashboardHTML();
+    console.log("HTML do esqueleto da Análise de Clientes injetado no container.");
+
+    // Agora, podemos obter as referências aos elementos internos com segurança.
     const kpiTotal = document.getElementById('kpi-total-clientes');
     const kpiNovos = document.getElementById('kpi-novos-clientes');
     const kpiRecorrentes = document.getElementById('kpi-clientes-recorrentes');
@@ -1957,18 +1972,19 @@ export async function populateCustomerAnalysisData() {
     const clientGrowthCanvas = document.getElementById('client-growth-chart');
     const clientSegmentationCanvas = document.getElementById('client-segmentation-chart');
 
+    // Uma verificação de segurança adicional, embora agora os elementos devam existir.
     if (!kpiTotal || !topClientsTable || !clientGrowthCanvas || !clientSegmentationCanvas) {
-        console.log("Elementos da aba de Análise de Clientes não encontrados. Pulando a população de dados.");
-        const contentPanel = document.getElementById('tab-content-clientes');
-        if (contentPanel) {
-            contentPanel.innerHTML = `<div class="text-center p-8 bg-red-50 text-red-700 rounded-lg">
-                <p class="font-bold">Erro ao carregar o painel.</p>
-                <p>Não foi possível encontrar os elementos necessários para exibir a análise de clientes.</p>
-            </div>`;
-        }
+        console.error("Elementos internos da aba de Análise de Clientes não encontrados após injeção do HTML. Pulando a população de dados.");
+        // Se, por algum motivo, ainda não encontrar, exiba uma mensagem de erro no próprio container.
+        customerAnalysisContainer.innerHTML = `<div class="text-center p-8 bg-red-50 text-red-700 rounded-lg">
+            <p class="font-bold">Erro ao carregar o painel.</p>
+            <p>Não foi possível encontrar os elementos internos necessários para exibir a análise de clientes.</p>
+            <p class="text-sm mt-2">Verifique o console para mais detalhes.</p>
+        </div>`;
         return;
     }
 
+    // Exiba estados de carregamento iniciais
     kpiTotal.textContent = '...';
     kpiNovos.textContent = '...';
     kpiRecorrentes.textContent = '...';
