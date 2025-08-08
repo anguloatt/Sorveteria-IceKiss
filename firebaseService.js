@@ -2,16 +2,59 @@
 
 // Importações do Firebase SDK
 import { db, storage } from './firebase-config.js';
-import { showToast } from './utils.js';
+import { showToast, getTomorrowDateString } from './utils.js';
 import {
-    collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where,
-    getDocs, addDoc, serverTimestamp, runTransaction, increment, writeBatch,
-    deleteField, orderBy, limit, Timestamp
+    collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs,
+    addDoc, serverTimestamp, runTransaction, increment, writeBatch, deleteField,
+    orderBy, limit, Timestamp
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-export { serverTimestamp };
+export { serverTimestamp, Timestamp };
 
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js";
 
+// Função interna para padronizar os dados de um pedido, convertendo strings para números e Timestamps para Datas.
+// Exportada apenas para fins de teste (por isso o `_`).
+export function _standardizeOrderData(doc) {
+    const data = doc.data();
+    if (!data) {
+        return { id: doc.id };
+    }
+    const standardized = { id: doc.id, ...data };
+
+    // Converte campos numéricos que podem vir como string
+    const numericFields = ['total', 'sinal', 'restante', 'orderNumber'];
+    for (const field of numericFields) {
+        if (standardized[field] && typeof standardized[field] === 'string') {
+            standardized[field] = parseFloat(standardized[field].replace(',', '.')) || 0;
+        } else if (typeof standardized[field] !== 'number') {
+            standardized[field] = Number(standardized[field]) || 0;
+        }
+    }
+
+    // Converte Timestamps para Date
+    const dateFields = ['createdAt', 'settledAt', 'cancelledAt', 'updatedAt', 'firstOrderDate', 'lastOrderDate'];
+    for (const field of dateFields) {
+        if (standardized[field] && typeof standardized[field].toDate === 'function') {
+            standardized[field] = standardized[field].toDate();
+        }
+    }
+    
+    // Padroniza os itens do pedido
+    if (standardized.items && Array.isArray(standardized.items)) {
+        standardized.items = standardized.items.map(item => {
+            const newItem = { ...item };
+            if (newItem.quantity && typeof newItem.quantity === 'string') {
+                newItem.quantity = parseInt(newItem.quantity, 10) || 0;
+            }
+            if (newItem.subtotal && typeof newItem.subtotal === 'string') {
+                newItem.subtotal = parseFloat(newItem.subtotal.replace(',', '.')) || 0;
+            }
+            return newItem;
+        });
+    }
+
+    return standardized;
+}
 // NOVA FUNÇÃO: Cria uma notificação no Firestore
 export async function createNotification(type, message, context = {}) {
     console.log(`createNotification: Criando notificação do tipo '${type}'.`);
@@ -224,7 +267,7 @@ export async function getNextOrderNumber() {
             transaction.set(counterRef, { count: nextOrderNumber });
 
             console.log(`getNextOrderNumber: Último pedido salvo: ${lastSavedOrderNumber}, Contador atual: ${currentCounterNumber}. Próximo número definido como: ${nextOrderNumber}`);
-            return nextOrderNumber;
+            return newOrderNumber;
         });
         return String(newOrderNumber).padStart(4, '0');
     } catch (error) {
@@ -593,6 +636,28 @@ export async function checkForDailyDeliveries() {
     }
 }
 
+// NOVA FUNÇÃO: Busca pedidos para lembretes de produção para amanhã
+export async function checkForTomorrowDeliveries() {
+    console.log("checkForTomorrowDeliveries: Verificando pedidos para retirada amanhã.");
+    // Usa a nova função utilitária para obter a data de amanhã no formato correto
+    const tomorrowFormatted = getTomorrowDateString('dd/mm/yyyy');
+
+    try {
+        const ordersCol = collection(db, "orders");
+        const q = query(ordersCol,
+            where("delivery.date", "==", tomorrowFormatted)
+        );
+        const querySnapshot = await getDocs(q);
+        const tomorrowDeliveries = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(order => order.status !== 'cancelado');
+        console.log(`checkForTomorrowDeliveries: ${tomorrowDeliveries.length} pedidos para retirada amanhã.`);
+        return tomorrowDeliveries;
+    } catch (error) {
+        console.error("checkForTomorrowDeliveries: Erro ao verificar entregas de amanhã:", error);
+        showToast("Erro ao verificar lembretes de produção para amanhã.", "error");
+        return [];
+    }
+}
+
 export async function fetchClients() {
     console.log("fetchClients: Buscando todos os clientes e agregando dados de pedidos.");
     try {
@@ -695,7 +760,9 @@ export async function findClientByPhone(phone) {
 
         ordersSnapshot.docs.forEach(doc => {
             const order = { id: doc.id, ...doc.data() };
+            if (!clientData.phone) clientData.phone = order.customer.phone;
             clientData.name = order.customer.name;
+
             clientData.orders.push({
                 id: order.id,
                 orderNumber: order.orderNumber,
@@ -1108,37 +1175,24 @@ export async function fetchStockLogs() {
 export async function fetchNextUpcomingOrder() {
     console.log("fetchNextUpcomingOrder: Buscando o próximo pedido agendado.");
     const ordersCol = collection(db, "orders");
-    const now = new Date();
+    // CORREÇÃO: Usa o Timestamp do Firebase para a consulta, garantindo consistência.
+    const nowTimestamp = Timestamp.fromDate(new Date());
 
     try {
+        // CORREÇÃO: A consulta agora filtra e ordena diretamente no banco de dados usando
+        // o novo campo 'deliveryTimestamp', que é muito mais eficiente e correto.
         const q = query(
             ordersCol,
             where("status", "in", ["ativo", "alterado"]),
-            orderBy("delivery.date", "asc"),
-            orderBy("delivery.time", "asc")
+            where("deliveryTimestamp", ">", nowTimestamp), // Filtra apenas por pedidos futuros.
+            orderBy("deliveryTimestamp", "asc"), // Ordena pela data/hora correta.
+            limit(1) // Pega apenas o próximo pedido.
         );
 
         const querySnapshot = await getDocs(q);
-        let nextOrder = null;
 
-        for (const doc of querySnapshot.docs) {
-            const order = { id: doc.id, ...doc.data() };
-            const deliveryDate = order.delivery?.date;
-            const deliveryTime = order.delivery?.time;
-
-            if (deliveryDate && deliveryTime) {
-                const [day, month, year] = deliveryDate.split('/').map(Number);
-                const [hours, minutes] = deliveryTime.split(':').map(Number);
-                const orderDateTime = new Date(year, month - 1, day, hours, minutes);
-
-                if (orderDateTime.getTime() > now.getTime()) {
-                    nextOrder = order;
-                    break;
-                }
-            }
-        }
-
-        if (nextOrder) {
+        if (!querySnapshot.empty) {
+            const nextOrder = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
             console.log(`fetchNextUpcomingOrder: Próximo pedido agendado encontrado: #${nextOrder.orderNumber} para ${nextOrder.customer?.name} em ${nextOrder.delivery?.date} às ${nextOrder.delivery?.time}.`);
             return nextOrder;
         } else {
@@ -1148,6 +1202,8 @@ export async function fetchNextUpcomingOrder() {
 
     } catch (error) {
         console.error("fetchNextUpcomingOrder: Erro ao buscar o próximo pedido agendado:", error);
+        // NOTA: Se você receber um erro no console sobre um índice ausente,
+        // o Firebase fornecerá um link para criá-lo automaticamente.
         return null;
     }
 }
@@ -1250,6 +1306,12 @@ export async function resolveExpiredOrder(orderId, orderData, user) {
  * @returns {Promise<object>} Um objeto contendo os dados processados.
  */
 export async function fetchSalesDataForDashboard(startDate, endDate) {
+    // NOTA DE DESEMPENHO: Esta função realiza a agregação de dados no lado do cliente (client-side).
+    // Para um volume baixo de pedidos, o desempenho é aceitável. No entanto, à medida que a base de dados cresce,
+    // buscar todos os pedidos e processá-los no navegador pode se tornar lento, especialmente em dispositivos móveis.
+    // Uma otimização futura e recomendada seria mover essa lógica de agregação para o backend,
+    // utilizando Firebase Cloud Functions. Uma Cloud Function poderia pré-calcular os totais e retornar
+    // apenas os dados consolidados, resultando em um carregamento muito mais rápido para o usuário.
     console.log(`fetchSalesDataForDashboard: Buscando dados de vendas entre ${startDate.toLocaleDateString()} e ${endDate.toLocaleDateString()}`);
 
     try {
@@ -1273,15 +1335,21 @@ export async function fetchSalesDataForDashboard(startDate, endDate) {
         const categoryRevenue = new Map();
         const categoryQuantity = new Map();
         const salesByHour = new Map();
+        
+        // NOVO: Conjunto para rastrear IDs de produtos não encontrados e evitar logs repetidos.
+        const missingProductIds = new Set();
 
         orders.forEach(order => {
-            const orderDate = order.createdAt.toDate().toISOString().split('T')[0];
-            const orderHour = order.createdAt.toDate().getHours();
+            const orderDate = order.createdAt instanceof Timestamp ? order.createdAt.toDate() : order.createdAt;
+            if (!(orderDate instanceof Date)) return;
+
+            const orderDateString = orderDate.toISOString().split('T')[0];
+            const orderHour = orderDate.getHours();
             
-            if (!dailyRevenue.has(orderDate)) {
-                dailyRevenue.set(orderDate, 0);
+            if (!dailyRevenue.has(orderDateString)) {
+                dailyRevenue.set(orderDateString, 0);
             }
-            dailyRevenue.set(orderDate, dailyRevenue.get(orderDate) + order.total);
+            dailyRevenue.set(orderDateString, dailyRevenue.get(orderDateString) + order.total);
 
             const customerName = order.customer?.name || 'Cliente Desconhecido';
             if (!customerSpending.has(customerName)) {
@@ -1296,10 +1364,18 @@ export async function fetchSalesDataForDashboard(startDate, endDate) {
 
             (order.items || []).forEach(item => {
                 const productDetails = productsMap.get(item.id);
-                const productName = item.isManual ? item.name : (productDetails?.name || 'Produto Desconhecido');
+
+                // CORREÇÃO: Se um produto não for encontrado na coleção principal (pode ter sido excluído),
+                // usamos o nome e a categoria que foram salvos no próprio item do pedido.
+                // Isso evita que produtos antigos apareçam como "Produto Desconhecido".
+                if (!item.isManual && !productDetails) {
+                    missingProductIds.add(item.id);
+                }
+
+                const productName = item.isManual ? item.name : (productDetails?.name || item.name || 'Produto Desconhecido');
                 const productCost = (productDetails && typeof productDetails.cost === 'number') ? productDetails.cost : null;
-                const productCategory = item.isManual ? 'manual' : (productDetails?.category || 'outros');
-                const productId = item.id || `manual_${productName}`;
+                const productCategory = item.isManual ? 'manual' : (productDetails?.category || item.category || 'outros');
+                const productId = item.id || `manual_${productName.replace(/\s/g, '_')}`;
 
                 if (!productSummary.has(productId)) {
                     productSummary.set(productId, { id: productId, name: productName, category: productCategory, quantity: 0, revenue: 0, totalCost: 0, costIsDefined: productCost !== null });
@@ -1317,19 +1393,26 @@ export async function fetchSalesDataForDashboard(startDate, endDate) {
                 }
                 categoryRevenue.set(productCategory, categoryRevenue.get(productCategory) + item.subtotal);
 
-                // *** INÍCIO DA CORREÇÃO ***
                 if (!categoryQuantity.has(productCategory)) {
                     categoryQuantity.set(productCategory, 0);
                 }
-                // A chave do mapa estava errada (era o próprio mapa). Corrigido para usar a categoria do produto.
                 categoryQuantity.set(productCategory, categoryQuantity.get(productCategory) + item.quantity);
-                // *** FIM DA CORREÇÃO ***
             });
         });
 
+        // NOVO: Loga um único aviso consolidado se algum produto não foi encontrado.
+        // AÇÃO CORRETIVA: Altero o log de 'warn' para 'info' e melhoro a mensagem.
+        // Isso deixa claro para o usuário que não se trata de um erro, mas de um comportamento esperado do sistema
+        // ao lidar com produtos que foram vendidos no passado e depois excluídos do cardápio.
+        // A lógica de fallback garante que os relatórios permaneçam precisos.
+        if (missingProductIds.size > 0) {
+            const message = `[Dashboard Data] Análise histórica: ${missingProductIds.size} produto(s) que não existem mais no cardápio atual foram encontrados em pedidos antigos. Usando dados históricos do pedido para garantir a precisão do relatório. IDs:`;
+            console.info(message, Array.from(missingProductIds));
+        }
+
         const productsList = Array.from(productSummary.values()).map(summary => ({
             ...summary,
-            profit: summary.costIsDefined ? (summary.revenue - summary.totalCost) : null
+            profit: summary.totalCost ? (summary.revenue - summary.totalCost) : null
         }));
         const totalGrossProfit = productsList.reduce((sum, p) => {
             return sum + (typeof p.profit === 'number' ? p.profit : 0);
@@ -1339,6 +1422,11 @@ export async function fetchSalesDataForDashboard(startDate, endDate) {
 
         const topCustomerData = Array.from(customerSpending.entries()).sort((a, b) => b[1] - a[1])[0] || ['N/A', 0];
         const peakDayData = Array.from(dailyRevenue.entries()).sort((a, b) => b[1] - a[1])[0] || ['N/A', 0];
+        
+        const salesByHourFormatted = Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            value: salesByHour.get(i) || 0
+        }));
 
         return {
             products: productsList,
@@ -1349,12 +1437,45 @@ export async function fetchSalesDataForDashboard(startDate, endDate) {
             salesPeak: { date: peakDayData[0], amount: peakDayData[1] },
             revenueByCategory: Array.from(categoryRevenue.entries()).map(([name, value]) => ({ name, value })),
             quantityByCategory: Array.from(categoryQuantity.entries()).map(([name, value]) => ({ name, value })),
-            salesByHour: Array.from(salesByHour.entries()).map(([hour, value]) => ({ hour, value })).sort((a, b) => a.hour - b.hour),
+            salesByHour: salesByHourFormatted,
             totalOrders: orders.length,
         };
     } catch (error) {
         console.error("fetchSalesDataForDashboard: Erro ao buscar e processar dados de vendas:", error);
         showToast("Erro ao carregar dados para o dashboard.", "error");
         return { products: [], totalGrossProfit: 0, totalRevenue: 0, averageTicket: 0, topCustomer: { name: 'N/A', totalSpent: 0 }, salesPeak: { date: 'N/A', amount: 0 }, revenueByCategory: [], quantityByCategory: [], salesByHour: [], totalOrders: 0 };
+    }
+}
+
+/**
+ * NOVO: Busca clientes cujo nome comece com o termo de pesquisa.
+ * Usa a coleção 'clients' para uma busca rápida e eficiente.
+ * @param {string} searchString O início do nome a ser pesquisado.
+ * @returns {Promise<Array<object>>} Uma lista de clientes correspondentes (limitado a 5).
+ */
+export async function searchClientsByName(searchString) {
+    if (!searchString || searchString.length < 2) {
+        return [];
+    }
+    // Formata a string de busca para Title Case para corresponder aos dados no DB
+    const formattedSearch = searchString.charAt(0).toUpperCase() + searchString.slice(1).toLowerCase();
+
+    console.log(`searchClientsByName: Buscando clientes que começam com: ${formattedSearch}`);
+    const clientsRef = collection(db, "clients");
+    // O caractere \uf8ff é um ponto de código Unicode muito alto.
+    // Isso efetivamente cria uma consulta de "começa com".
+    const q = query(
+        clientsRef,
+        where("name", ">=", formattedSearch),
+        where("name", "<=", formattedSearch + '\uf8ff'),
+        limit(5) // Limita a 5 sugestões para não sobrecarregar a UI.
+    );
+
+    try {
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Erro ao buscar clientes por nome:", error);
+        return [];
     }
 }

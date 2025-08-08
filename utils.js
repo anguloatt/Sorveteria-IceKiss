@@ -1,6 +1,7 @@
 // Meu arquivo de funções utilitárias e de interface (toasts, modais, formatação).
 
 import { dom } from './domRefs.js';
+import { checkForTomorrowDeliveries } from './firebaseService.js';
 import { managerCredentials, masterCredentials, productsConfig, storeSettings, currentReminderOrders } from './app.js';
 
 // Eu carrego a biblioteca date-fns via CDN no index.html.
@@ -65,7 +66,7 @@ export function showCustomConfirm(title, message, options = {}) {
 
         confirmModalTitle.textContent = title;
         confirmModalMessage.innerHTML = message; // Use innerHTML para permitir tags como <br>
-
+        
         confirmModalInputUser.value = '';
         confirmModalInputPass.value = '';
 
@@ -157,19 +158,6 @@ export function showCustomConfirm(title, message, options = {}) {
 }
 
 /**
- * Formata um valor numérico para o formato de moeda brasileira (R$ X.XXX,XX).
- * @param {number} value O valor numérico.
- * @returns {string} O valor formatado como moeda.
- */
-export function formatCurrency(value) {
-    const numberValue = Number(value);
-    if (isNaN(numberValue)) {
-        return 'R$ 0,00'; // Retorna um valor padrão para inválidos
-    }
-    return numberValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-/**
  * Arredonda um valor para 2 casas decimais, tratando problemas de ponto flutuante.
  * @param {number} value O valor a ser arredondado.
  * @returns {number} O valor arredondado.
@@ -189,12 +177,22 @@ export function parseCurrency(currencyString) {
     if (typeof currencyString !== 'string' || !currencyString) {
         return 0;
     }
-    const cleanedString = currencyString.replace(/[^\d,]/g, '');
-    const numberString = cleanedString.replace(',', '.');
+
+    // Remove caracteres não numéricos, exceto ponto e vírgula.
+    let numberString = currencyString.replace(/[^\d,.]/g, '');
+
+    // Verifica se o último separador é uma vírgula (estilo brasileiro)
+    if (numberString.lastIndexOf(',') > numberString.lastIndexOf('.')) {
+        // Remove os pontos (milhares) e substitui a vírgula (decimal) por ponto.
+        numberString = numberString.replace(/\./g, '').replace(',', '.');
+    } else {
+        // Assume estilo internacional (ex: 1,234.56), remove as vírgulas (milhares).
+        numberString = numberString.replace(/,/g, '');
+    }
+
     const value = parseFloat(numberString);
     return isNaN(value) ? 0 : value;
 }
-
 
 /**
  * Formata uma data para o formato DD/MM/YYYY.
@@ -208,6 +206,20 @@ export function formatDateToBR(date) {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
+}
+
+/**
+ * Formata um valor numérico para o formato de moeda brasileira (R$ X.XXX,XX).
+ * @param {number} value O valor numérico.
+ * @returns {string} O valor formatado como moeda.
+ */
+export function formatCurrency(value) {
+    const numberValue = Number(value);
+    if (isNaN(numberValue)) {
+        // Retorna o mesmo formato que toLocaleString retornaria para 0, garantindo consistência.
+        return (0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    return numberValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 /**
@@ -244,6 +256,22 @@ export function getTodayDateString(format = 'yyyy-mm-dd') {
     return ''; // Padrão
 }
 
+// NOVO: Adiciona a função para obter a data de amanhã no formato DD/MM/YYYY
+export function getTomorrowDateString(format = 'dd/mm/yyyy') {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const year = tomorrow.getFullYear();
+
+    if (format === 'yyyy-mm-dd') {
+        return `${year}-${month}-${day}`;
+    } else if (format === 'dd/mm/yyyy') {
+        return `${day}/${month}/${year}`;
+    }
+    return '';
+}
+
 /**
  * Atualiza o elemento que exibe o dia da semana com base na data do input.
  * @param {string} dateString A data no formato 'YYYY-MM-DD'.
@@ -255,6 +283,7 @@ export function updateWeekdayDisplay(dateString) {
         return;
     }
     const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+    // CORREÇÃO CRÍTICA: Evita problemas de fuso horário.
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     dom.deliveryDateWeekday.textContent = weekdays[date.getDay()];
@@ -275,14 +304,17 @@ export function formatNameToTitleCase(str) {
  * @param {Event} e O evento de input.
  */
 export function formatPhone(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    value = value.substring(0, 11);
+    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+    value = value.substring(0, 11); // Limita a 11 dígitos (DDD + 9 dígitos)
 
     if (value.length > 10) {
+        // (XX) XXXXX-XXXX
         value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
     } else if (value.length > 6) {
+        // (XX) XXXX-XXXX
         value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
     } else if (value.length > 2) {
+        // (XX) XXXX
         value = value.replace(/^(\d{2})(\d{0,5}).*/, '($1) $2');
     } else if (value.length > 0) {
         value = `(${value}`;
@@ -296,6 +328,7 @@ export function formatPhone(e) {
  */
 export function formatTime(e) {
     const input = e.target;
+
     let value = input.value.replace(/\D/g, '');
 
     if (value.length >= 2) {
@@ -315,6 +348,7 @@ export function formatTime(e) {
     if (value.length > 2) {
         value = `${value.substring(0, 2)}:${value.substring(2, 4)}`;
     }
+
     input.value = value;
 }
 
@@ -337,6 +371,12 @@ export function getProductInfoById(productId) {
     return null;
 }
 
+/**
+ * Função auxiliar para centralizar texto em uma largura específica.
+ * @param {string} text O texto a ser centralizado.
+ * @param {number} width A largura total desejada.
+ * @returns {string} O texto centralizado com espaços.
+ */
 export const centerText = (text, width = 40) => {
     const padding = Math.max(0, width - text.length);
     const padLeft = Math.floor(padding / 2);
@@ -344,20 +384,36 @@ export const centerText = (text, width = 40) => {
     return ' '.repeat(padLeft) + text + ' '.repeat(padRight);
 };
 
+/**
+ * Função auxiliar para alinhar texto à direita em uma largura específica.
+ * @param {string} text O texto a ser alinhado à direita.
+ * @param {number} width A largura total desejada.
+ * @returns {string} O texto alinhado à direita com espaços.
+ */
 export const rightAlignText = (text, width = 40) => {
     return ' '.repeat(Math.max(0, width - text.length)) + text;
 };
 
+/**
+ * Função auxiliar para alinhar texto à esquerda em uma largura específica.
+ * @param {string} text O texto a ser alinhado à esquerda.
+ * @param {number} width A largura total desejada.
+ * @returns {string} O texto alinhado à esquerda com espaços.
+ */
 export const leftAlignText = (text, width = 40) => {
     return text + ' '.repeat(Math.max(0, width - text.length));
 };
 
-export const twoColumns = (left, right, width = 40) => {
-    const spaceBetween = Math.max(1, width - left.length - right.length);
-    return left + ' '.repeat(spaceBetween) + right;
-};
+/**
+ * NOVO: Função base refatorada para gerar o conteúdo do ticket.
+ * As outras funções (generateTicketText, generatePrintableTicketText) chamarão esta.
+ * @param {object} order O objeto do pedido.
+ * @param {object} options Opções de formatação, como { useHtml: boolean }.
+ * @returns {string} O texto formatado do ticket.
+ */
+function _generateTicketContent(order, options = {}) {
+    const { useHtml = false } = options;
 
-export function generateTicketText(order) {
     if (!order || !storeSettings) {
         console.error("Dados do pedido ou configurações da loja não disponíveis para gerar ticket.");
         return "Erro ao gerar comprovante.";
@@ -383,7 +439,9 @@ export function generateTicketText(order) {
     text += `${thinSeparator}\n`;
 
     text += `PEDIDO: ${order.orderNumber}\n`;
-    text += `EMISSAO: ${formatDateTimeToBR(order.createdAt)}\n`;
+    // Usa a data do pedido, que pode ser um Timestamp do Firebase ou um Date do JS.
+    const createdAtDate = order.createdAt?.toDate ? order.createdAt.toDate() : order.createdAt;
+    text += `EMISSAO: ${formatDateTimeToBR(createdAtDate)}\n`;
     text += `OPERADOR: ${order.createdBy?.name || 'N/A'}\n`;
     text += `${thinSeparator}\n`;
 
@@ -401,16 +459,22 @@ export function generateTicketText(order) {
     }
 
     text += `RETIRADA:${order.delivery?.date || 'N/A'} ${deliveryWeekday} as ${order.delivery?.time || 'N/A'}\n`;
+
+    if (order.observations) {
+        text += `${thinSeparator}\n`;
+        text += `OBSERVACOES:\n${order.observations}\n`;
+    }
     text += `${separator}\n`;
 
     if (printUnitPrice) {
-        text += `${leftAlignText("QTD.ITEM (VL.UNIT)", width)}\n`;
+        text += `${twoColumns("ITEM (VL.UNIT)", "TOTAL R$", width)}\n`;
     } else {
         text += `${twoColumns("QTD.ITEM", "TOTAL R$", width)}\n`;
     }
     text += `${thinSeparator}\n`;
 
     let totalSalgados = 0;
+    let hasKibe = false;
 
     (order.items || []).forEach(item => {
         const itemName = item.isManual ? item.name : getProductInfoById(item.id)?.name || item.name;
@@ -420,15 +484,21 @@ export function generateTicketText(order) {
             itemLine += ` (${formatCurrency(item.unitPrice)})`;
         }
 
-        const maxItemNameLength = printUnitPrice ? 20 : 28;
-        if (itemLine.length > maxItemNameLength) {
-            itemLine = itemLine.substring(0, maxItemNameLength - 3) + '...';
+        const priceString = formatCurrency(item.subtotal);
+        const maxItemLineLength = width - priceString.length - 1;
+
+        if (itemLine.length > maxItemLineLength) {
+            itemLine = itemLine.substring(0, maxItemLineLength - 3) + '...';
         }
 
-        text += `${twoColumns(itemLine, formatCurrency(item.subtotal), width)}\n`;
+        text += `${twoColumns(itemLine, priceString, width)}\n`;
 
-        if (item.category === 'fritos' || item.category === 'assados' || item.category === 'revenda') {
+        if (['fritos', 'assados', 'revenda'].includes(item.category)) {
             totalSalgados += item.quantity;
+        }
+
+        if (itemName.toLowerCase().includes('kibe')) {
+            hasKibe = true;
         }
     });
 
@@ -442,17 +512,86 @@ export function generateTicketText(order) {
     text += `${rightAlignText("SINAL: " + formatCurrency(order.sinal), width)}\n`;
     text += `${rightAlignText("VALOR EM ABERTO: " + formatCurrency(order.restante), width)}\n`;
     text += `${thinSeparator}\n`;
-    const paymentStatusText = order.paymentStatus === 'pago' ? 'SALDO TOTAL PAGO' : 'EM ABERTO';
+    const paymentStatusText = (order.paymentStatus === 'pago' || order.restante <= 0) ? 'SALDO TOTAL PAGO' : 'EM ABERTO';
     text += `${centerText(`STATUS DO PG: * ${paymentStatusText} *`, width)}\n`;
     text += `${separator}\n`;
+
     text += `${centerText(footerMessage, width)}\n`;
-    text += `\n\n`;
+    text += `${centerText("Obrigado(a)! Volte Sempre!", width)}\n`;
+
+    if (useHtml && hasKibe && settings.kibePrintSize !== 'disabled') {
+        const kibeSize = settings.kibePrintSize || '3x';
+        const kibeText = '* KIBE *';
+        const fontSizes = { '1x': '1em', '2x': '1.5em', '3x': '2em', '4x': '2.5em', '5x': '3em' };
+        const fontSize = fontSizes[kibeSize] || fontSizes['3x'];
+        text += `${centerText(' ', width)}\n`;
+        text += `<div style="text-align: center; font-size: ${fontSize}; font-weight: bold; page-break-after: avoid !important;">${kibeText}</div>\n`;
+        text += `${centerText(' ', width)}\n`;
+    }
 
     return text;
 }
 
+/**
+ * GERA O TEXTO COM HTML PARA IMPRESSÃO E PRÉ-VISUALIZAÇÃO.
+ * Esta versão usa HTML/CSS para formatar o texto, garantindo que a impressão
+ * e a pré-visualização no painel do gerente sejam idênticas.
+ * @param {object} order O objeto do pedido.
+ * @returns {string} O texto formatado do ticket com HTML.
+ */
+export function generatePrintableTicketText(order) {
+    // Chama a função base com a opção de usar HTML.
+    return _generateTicketContent(order, { useHtml: true });
+}
+
+
+/**
+ * Função auxiliar para alinhar duas colunas (esquerda e direita) em uma largura total.
+ * @param {string} left O texto da coluna esquerda.
+ * @param {string} right O texto da coluna direita.
+ * @param {number} width A largura total desejada.
+ * @returns {string} As duas colunas alinhadas.
+ */
+export const twoColumns = (left, right, width = 40) => {
+    const spaceBetween = Math.max(1, width - left.length - right.length);
+    return left + ' '.repeat(spaceBetween) + right;
+};
+
+/**
+ * GERA O TEXTO SIMPLES PARA WHATSAPP (FORMATO CUPOM).
+ * Esta versão é apenas texto, sem formatação especial, para garantir compatibilidade.
+ * @param {object} order O objeto do pedido.
+ * @returns {string} O texto formatado do ticket.
+ */
+export function generateTicketText(order) {
+    // Chama a função base sem a opção de usar HTML.
+    return _generateTicketContent(order, { useHtml: false });
+}
+
+/**
+ * GERA O TEXTO COM HTML PARA A PRÉ-VISUALIZAÇÃO NO PAINEL GERENCIAL.
+ * Esta versão simula o tamanho da fonte do "KIBE" usando tags HTML e CSS.
+ * @param {object} order O objeto do pedido.
+ * @returns {string} O texto formatado do ticket com HTML.
+ */
+export function generatePreviewTicketText(order) {
+    // A pré-visualização é idêntica à impressão, então chama a mesma função.
+    return generatePrintableTicketText(order);
+}
+
+/**
+ * GERA O TEXTO FORMATADO PARA IMPRESSÃO DO LEMBRETE DE PRODUÇÃO (FORMATO CUPOM).
+ * @param {Array<object>} orders A lista de pedidos para o lembrete.
+ * @returns {string} O texto formatado do lembrete.
+ */
 export function generatePrintableReminderText(orders) {
-    let text = `========================================\n`;
+    const weekdays = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
+    const today = new Date();
+    const weekdayName = weekdays[today.getDay()];
+    const weekdayHighlight = `<div style="text-align: center; font-size: 2.5em; font-weight: bold; margin-bottom: 10px;">* ${weekdayName} *</div>\n`;
+
+    let text = `${weekdayHighlight}`;
+    text += `========================================\n`;
     text += `${centerText("Lembrete de Producao Diaria", 40)}\n`;
     text += `Data: ${getTodayDateString('dd/mm/yyyy')}\n`;
     text += `Atualizado em: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}\n`;
@@ -508,12 +647,186 @@ export function generatePrintableReminderText(orders) {
     return text;
 }
 
+// NOVA FUNÇÃO: Gera o texto formatado para o Lembrete de Produção para Amanhã
+export function generatePrintableTomorrowReminderText(orders) {
+    const tomorrowDate = getTomorrowDateString('dd/mm/yyyy');
+    const weekdays = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const weekdayName = weekdays[tomorrow.getDay()];
+    const weekdayHighlight = `<div style="text-align: center; font-size: 2.5em; font-weight: bold; margin-bottom: 10px;">* ${weekdayName} *</div>\n`;
+
+    let text = `${weekdayHighlight}`;
+    text += `========================================\n`;
+    text += `${centerText("Lembrete de Producao para Amanha", 40)}\n`;
+    text += `Data: ${tomorrowDate}\n`;
+    text += `Atualizado em: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}\n`;
+    text += `========================================\n`;
+
+    const consolidatedItems = {};
+    let totalSalgados = 0;
+
+    orders.forEach(order => {
+        (order.items || []).forEach(item => {
+            const key = item.name || getProductInfoById(item.id).name;
+            consolidatedItems[key] = (consolidatedItems[key] || 0) + item.quantity;
+            if (['fritos', 'assados', 'revenda'].includes(item.category)) {
+                totalSalgados += item.quantity;
+            }
+        });
+    });
+
+    if (Object.keys(consolidatedItems).length > 0) {
+        text += `ITENS PARA PRODUZIR:\n`;
+        Object.entries(consolidatedItems).sort((a, b) => b[1] - a[1]).forEach(([name, count]) => {
+            text += `${String(count).padEnd(5)} ${name}\n`;
+        });
+    } else {
+        text += `${centerText("Nenhum item para produzir amanhã.", 40)}\n`;
+    }
+
+    text += `----------------------------------------\n`;
+    text += `${leftAlignText("TOTAL SALGADOS: " + totalSalgados, 40)}\n`;
+    text += `========================================\n`;
+    text += `PEDIDOS PARA RETIRADA AMANHÃ:\n`;
+
+    if (orders.length > 0) {
+        orders.sort((a, b) => (a.delivery?.time || '99:99').localeCompare(b.delivery?.time || '99:99')).forEach(order => {
+            text += `\nPedido: ${order.orderNumber}\n`;
+            text += `Cliente: ${order.customer?.name || 'N/A'}\n`;
+            text += `Retirada: ${order.delivery?.time || 'N/A'}\n`;
+            text += `  Itens:\n`;
+            (order.items || []).forEach(item => {
+                const itemName = item.name || getProductInfoById(item.id).name;
+                text += `    - ${item.quantity} ${itemName}\n`;
+            });
+        });
+    } else {
+        text += `${centerText("Nenhum pedido para retirada amanhã.", 40)}\n`;
+    }
+
+    text += `========================================\n`;
+
+    return text;
+}
+
+/**
+ * NOVO: Função para imprimir a lista de lembretes de produção de amanhã.
+ */
+export async function printTomorrowReminderList() {
+    // Importa dinamicamente a função de busca para evitar dependência circular
+    const { checkForTomorrowDeliveries } = await import('./firebaseService.js');
+    const tomorrowOrders = await checkForTomorrowDeliveries();
+    
+    // Se não houver pedidos para amanhã, apenas exibe um toast
+    if (tomorrowOrders.length === 0) {
+        showToast("Nenhum pedido para amanhã para imprimir.", "info");
+        return;
+    }
+
+    const reminderContent = generatePrintableTomorrowReminderText(tomorrowOrders);
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        showToast("Permita pop-ups para imprimir.", "error");
+        return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Lembrete de Produção para Amanhã</title>
+            <style>
+                body { font-family: 'Courier New', Courier, monospace; font-size: 14px; margin: 0; padding: 5px; width: 80mm; box-sizing: border-box; }
+                pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
+            </style>
+        </head>
+        <body>
+            <pre>${reminderContent}</pre>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    };
+}
+
+/**
+ * NOVO: Mostra o modal de lembrete de produção para o dia seguinte.
+ */
+export async function showTomorrowReminderModal(orders) {
+    console.log("showTomorrowReminderModal: Exibindo modal de lembrete para amanhã.");
+    const { modal, date, summaryItems, ordersList, closeBtn, printBtn, weekdayHighlight, title } = dom.tomorrowReminder || {};
+
+    // CORREÇÃO: Verifica os elementos essenciais e permite que a função continue mesmo se os opcionais estiverem faltando.
+    if (!modal || !date || !summaryItems || !ordersList || !closeBtn || !printBtn) {
+        console.error("showTomorrowReminderModal: Um ou mais elementos do modal de lembrete de amanhã não foram encontrados.");
+        return;
+    }
+
+    // Atualiza os elementos visuais opcionais apenas se eles existirem.
+    if (weekdayHighlight && title) {
+        const weekdays = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        weekdayHighlight.textContent = weekdays[tomorrow.getDay()];
+        title.textContent = 'Lembrete de Produção (AMANHÃ)';
+    }
+
+    let tomorrowOrders;
+    // CORREÇÃO: Verifica se o argumento 'orders' é um array. Se não for (ex: é um objeto de evento
+    // de um clique de botão), a função busca os dados. Isso corrige o erro 'sort is not a function'.
+    if (Array.isArray(orders)) {
+        tomorrowOrders = orders;
+    } else {
+        console.log("showTomorrowReminderModal: Pedidos não fornecidos ou chamada de evento. Buscando no Firebase...");
+        tomorrowOrders = await checkForTomorrowDeliveries();
+    }
+
+    if (tomorrowOrders.length === 0) {
+        showToast("Nenhum pedido para amanhã.", "info");
+        return;
+    }
+
+    date.textContent = getTomorrowDateString('dd/mm/yyyy');
+    const consolidatedItems = {};
+    let ordersListHtml = '';
+
+    tomorrowOrders.sort((a, b) => (a.delivery?.time || '99:99').localeCompare(b.delivery?.time || '99:99')).forEach(order => {
+        ordersListHtml += `<div class="bg-gray-100 p-3 rounded-lg"><div class="flex justify-between items-center font-semibold"><span>Pedido ${order.orderNumber} - ${order.customer?.name}</span><span class="text-purple-600">Retirada: ${order.delivery?.time || 'N/A'}</span></div><ul class="list-disc list-inside text-sm text-gray-600 mt-1 ml-2">${(order.items || []).map(i => `<li>${i.quantity} ${i.name || getProductInfoById(i.id).name}</li>`).join('')}</ul></div>`;
+        order.items.forEach(item => {
+            const key = item.name || getProductInfoById(item.id).name;
+            consolidatedItems[key] = (consolidatedItems[key] || 0) + item.quantity;
+        });
+    });
+
+    summaryItems.innerHTML = Object.entries(consolidatedItems).sort((a, b) => b[1] - a[1]).map(([name, qty]) => `<div class="flex justify-between items-center bg-white/60 p-1.5 rounded"><span class="truncate pr-2">${name}</span><span class="font-bold bg-purple-500 text-white rounded-full px-2 py-0.5">${qty}</span></div>`).join('') || '<p class="text-center col-span-full">Nenhum item para produzir amanhã.</p>';
+    ordersList.innerHTML = ordersListHtml;
+
+    // Listeners do modal
+    closeBtn.onclick = () => modal.classList.remove('active');
+    printBtn.onclick = () => printTomorrowReminderList(); // Reutiliza a função de impressão já existente
+
+    modal.classList.add('active');
+    console.log("showTomorrowReminderModal: Lembrete de entregas de amanhã exibido.");
+}
+
+/**
+ * Imprime o ticket/comprovante de um pedido.
+ * @param {object} order O objeto do pedido.
+ */
 export function printTicket(order) {
     if (!order || !order.orderNumber) {
         showToast("Pedido inválido para impressão.", "error");
         return;
     }
-    const ticketContent = generateTicketText(order);
+    const ticketContent = generatePrintableTicketText(order);
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -521,6 +834,7 @@ export function printTicket(order) {
         console.error("printTicket: Janela de impressão bloqueada.");
         return;
     }
+    //font-size: 13px; /* Tamanho da fonte aumentado para melhor leitura */
     printWindow.document.open();
     printWindow.document.write(`
         <!DOCTYPE html>
@@ -530,6 +844,17 @@ export function printTicket(order) {
             <style>
                 body { font-family: 'Courier New', Courier, monospace; font-size: 14px; margin: 0; padding: 5px; width: 80mm; box-sizing: border-box; }
                 pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
+                /* Adiciona o estilo do destaque do Kibe para o comprovante */
+                .kibe-highlight {
+                    text-align: center;
+                    font-weight: bold;
+                    page-break-after: avoid !important;
+                }
+                .kibe-highlight.size-1x { font-size: 1em; }
+                .kibe-highlight.size-2x { font-size: 1.5em; }
+                .kibe-highlight.size-3x { font-size: 2em; }
+                .kibe-highlight.size-4x { font-size: 2.5em; }
+                .kibe-highlight.size-5x { font-size: 3em; }
             </style>
         </head>
         <body>
@@ -559,12 +884,64 @@ export function sendWhatsAppMessage(order) {
 
     const ticketText = generateTicketText(order);
 
-    // *** INÍCIO DA CORREÇÃO ***
-    // Troca o link "wa.me" pelo link "api.whatsapp.com" para melhor compatibilidade com desktop.
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=55${phone}&text=${encodeURIComponent(ticketText)}`;
-    // *** FIM DA CORREÇÃO ***
-    
+    const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(ticketText)}`;
     window.open(whatsappUrl, '_blank');
+}
+
+/**
+ * Abre o modal para enviar uma mensagem de WhatsApp personalizada.
+ * @param {string} phone O número de telefone do destinatário.
+ * @param {string} name O nome do destinatário para exibir no modal.
+ */
+export function openWhatsappModal(phone, name) {
+    const { modal, clientName, messageInput } = dom.whatsapp;
+    if (!modal || !clientName || !messageInput) {
+        console.error("Elementos do modal de WhatsApp não encontrados.");
+        return;
+    }
+    clientName.textContent = name || 'Cliente';
+    messageInput.value = '';
+    modal.dataset.phone = phone;
+    modal.classList.add('active');
+    messageInput.focus();
+}
+
+/**
+ * Função para enviar mensagem em grupo para o WhatsApp.
+ * @param {string[]} phones - Array com os números de telefone.
+ * @param {string} message - A mensagem a ser enviada.
+ */
+export async function sendGroupWhatsapp(phones, message) {
+    if (!phones || phones.length === 0) {
+        showToast("Nenhum cliente selecionado.", "error");
+        return;
+    }
+    if (!message.trim()) {
+        showToast("A mensagem não pode estar vazia.", "error");
+        return;
+    }
+
+    const confirmed = await showCustomConfirm(
+        "Enviar Mensagem em Massa",
+        `Você está prestes a enviar uma mensagem para ${phones.length} cliente(s). Uma nova aba será aberta para cada cliente. Deseja continuar?`,
+        { okButtonText: "Sim, Enviar", okButtonClass: "bg-green-600 hover:bg-green-700" }
+    );
+
+    if (confirmed) {
+        showToast(`Iniciando envio para ${phones.length} clientes...`, "info");
+        const encodedMessage = encodeURIComponent(message);
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        for (const phone of phones) {
+            const cleanPhone = phone.replace(/\D/g, '');
+            if (cleanPhone.length >= 10) {
+                const url = `https://wa.me/55${cleanPhone}?text=${encodedMessage}`;
+                window.open(url, '_blank');
+                await delay(300); // Pequeno atraso para evitar bloqueio de pop-up
+            }
+        }
+    }
 }
 
 /**
@@ -640,6 +1017,7 @@ export function printReminderList() {
         showToast("Permita pop-ups para imprimir.", "error");
         return;
     }
+    //font-size: 13px; /* Tamanho da fonte aumentado para melhor leitura */
     printWindow.document.open();
     printWindow.document.write(`
         <!DOCTYPE html>
@@ -733,7 +1111,7 @@ export function formatClientSince(firstOrderDate) {
 export function getSalgadosCountFromItems(items) {
     if (!items || !Array.isArray(items)) return 0;
     return items.reduce((total, item) => {
-        if (item.category === 'assados' || item.category === 'fritos' || item.category === 'revenda') {
+        if (item.category === 'assados' || item.category === 'fritos') {
             return total + item.quantity;
         }
         return total;

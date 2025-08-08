@@ -1,5 +1,6 @@
 import { collection, query, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { showToast, formatDateTimeToBR } from './utils.js';
+import { db } from './firebase-config.js'; // AÇÃO CORRETIVA: Importo a instância do Firestore diretamente.
 
 let allLogs = []; // Meu cache para os logs, para evitar múltiplas leituras do banco de dados.
 let hasLoadedOnce = false; // Minha flag para controlar se o carregamento inicial já foi feito.
@@ -9,7 +10,7 @@ let hasLoadedOnce = false; // Minha flag para controlar se o carregamento inicia
  * @param {object} db A instância do Firestore.
  * @returns {Promise<Array>} Retorno uma promessa que resolve para um array de logs.
  */
-async function fetchActivityLogs(db) {
+async function fetchActivityLogs() {
     // Se eu já carreguei os logs, retorno a versão em cache para economizar leituras.
     if (hasLoadedOnce) {
         console.log("Usando logs de atividade em cache.");
@@ -18,7 +19,9 @@ async function fetchActivityLogs(db) {
 
     console.log("Buscando logs de atividade do Firebase...");
     try {
-        const logsRef = collection(db, 'activityLog');
+        // AÇÃO CORRETIVA: A função `collection` estava recebendo `db` como undefined e o nome da coleção estava incorreto.
+        // Ao importar `db` diretamente e corrigir o nome para 'activity_logs', garanto que a busca seja feita corretamente.
+        const logsRef = collection(db, 'activity_logs');
         // Ordeno por data/hora decrescente e limito aos últimos 200 para melhorar a performance.
         const q = query(logsRef, orderBy("timestamp", "desc"), limit(200));
         const querySnapshot = await getDocs(q);
@@ -87,9 +90,9 @@ function applyFilters() {
     renderLogs(filteredLogs);
 }
 
-export async function initActivityLogView(db) {
+export async function initActivityLogView() {
     showToast("Carregando logs...", "info", 1500);
-    const logs = await fetchActivityLogs(db);
+    const logs = await fetchActivityLogs();
     renderLogs(logs);
 }
 

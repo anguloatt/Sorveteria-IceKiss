@@ -2,6 +2,9 @@
 
 import { dom } from './domRefs.js'; // Importa o objeto dom centralizado
 // NOVO: Importa a função para atualizar o painel de resumo em tempo real
+// NOVO: Importa as funções de gerenciamento offline
+import { isAppOnline, queueOrderForSync, getCachedProducts } from './offlineManager.js';
+
 import { updateLiveSummary } from './pdv-live-summary.js';
 import {
     showToast, showCustomConfirm, formatCurrency, parseCurrency,
@@ -13,12 +16,14 @@ import {
     generateTicketText, generatePrintableReminderText,
     printTicket, // Esta função agora usa generateTicketText internamente
     sendWhatsAppMessage, // Esta função agora usa generateTicketText internamente
-    updateWeekdayDisplay,
-    printReminderList // Esta função agora usa generatePrintableReminderText internamente
+    updateWeekdayDisplay, 
+    printReminderList, // Esta função agora usa generatePrintableReminderText internamente
+    // NOVO: Importa o modal de lembrete de amanhã para ser usado no login.
+    showTomorrowReminderModal
 } from './utils.js'; // Importa funções utilitárias
 import {
     currentUser, currentOrder, productsConfig, storeSettings, getNextOrderNumber, peekNextOrderNumber, employees, setCurrentUser,
-    managerCredentials, masterCredentials, currentReminderOrders
+    managerCredentials, masterCredentials, currentReminderOrders, db
 } from './app.js'; // Importa variáveis globais do app.js
 import { 
     saveOrder as firebaseSaveOrder, updateOrder as firebaseUpdateOrder, 
@@ -26,7 +31,10 @@ import {
     findOrder as firebaseFindOrder, checkForDailyDeliveries, createNotification, findLastOrder, serverTimestamp, 
     findNextOrder as firebaseFindNextOrder, findPreviousOrder as firebaseFindPreviousOrder, changeEmployeePassword, findClientByPhone, findClientByName,
     updateProductStock,
-    upsertClientOnOrder
+    upsertClientOnOrder, 
+    Timestamp,
+    searchClientsByName, // NOVO: Importa a função de busca por nome parcial
+    fetchNextUpcomingOrder // NOVO: Importa a função para buscar o próximo pedido
 } from './firebaseService.js'; // Importa funções de serviço Firebase
 
 // Importa funções do gerente que podem ser chamadas do PDV
@@ -35,20 +43,40 @@ import { handleManagerAccess, navigateToManagerView, openInteractiveTimeSelector
 // Importa a função para abrir o relatório do funcionário
 import { openEmployeeReport } from './employeeReport.js';
 
-// NOVO: Importa o serviço de IA e a biblioteca para renderizar Markdown
-import { generatePdvSuggestion } from './aiService.js';
-import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
-
 // Variável local para o pedido atual no PDV
 let pdvCurrentOrder = null;
-// NOVO: Timer para o debounce da sugestão da IA, para evitar chamadas excessivas.
-let suggestionDebounceTimer = null;
 // NOVO: Timer para o debounce da busca de cliente, para evitar erro 429.
 let clientLookupDebounceTimer = null;
 
 // Renderiza os produtos no PDV com o novo layout de colunas
 export function renderProducts() {
     console.log("renderProducts: Iniciando renderização dos produtos.");
+
+    // NOVO: Lógica para carregar produtos do cache se estiver offline
+    if (!isAppOnline()) {
+        console.log("MODO OFFLINE: Carregando produtos do cache local.");
+        const cachedProductsArray = getCachedProducts();
+        if (cachedProductsArray && cachedProductsArray.length > 0) {
+            // Limpa o objeto de configuração global antes de preenchê-lo
+            Object.keys(productsConfig).forEach(key => delete productsConfig[key]);
+            
+            // Preenche o objeto de configuração global com os dados do cache
+            cachedProductsArray.forEach(product => {
+                const category = product.category || 'outros';
+                if (!productsConfig[category]) {
+                    productsConfig[category] = [];
+                }
+                productsConfig[category].push(product);
+            });
+            console.log("MODO OFFLINE: productsConfig populado com dados do cache:", productsConfig);
+        } else {
+            showToast("Cardápio indisponível. Conecte-se à internet para carregar.", "error", 5000);
+            // Limpa a UI para evitar confusão
+            Object.values(dom.cardapioColumns).forEach(col => col.innerHTML = '');
+            return;
+        }
+    }
+
     console.log("renderProducts: productsConfig atual:", productsConfig);
     
     if (!dom.cardapioColumns || !dom.cardapioColumns.assados || !dom.cardapioColumns.fritos || !dom.cardapioColumns.revenda || !dom.cardapioColumns.extra) {
@@ -137,63 +165,105 @@ function renderManualItemToDisplay(item) {
 }
 
 /**
- * NOVO: Função debounced para buscar dados do cliente e gerar sugestões de IA.
+ * NOVO: Função debounced para buscar dados do cliente e exibir sugestões.
  * É acionada após o usuário parar de digitar no nome ou telefone para evitar
  * chamadas de API excessivas e o erro 429 (Too Many Requests).
  */
 const debouncedClientLookup = () => {
     clearTimeout(clientLookupDebounceTimer);
     clientLookupDebounceTimer = setTimeout(async () => {
-        const name = dom.customerName.value.trim();
-         // Se o nome for muito curto, esconde o selo e a sugestão
-        if (name.length < 3 && dom.customerPhone.value.length < 10) {
-            hideClientSeal();
-            if (dom.pdvAiSuggestions?.container)
-             dom.pdvAiSuggestions.container.classList.add('hidden');
+        // Se o foco não estiver mais no campo de nome, não faz nada.
+        if (document.activeElement !== dom.customerName) {
             return;
         }
+
+        const name = dom.customerName.value.trim();
         const phone = dom.customerPhone.value.trim();
         const rawPhone = phone.replace(/\D/g, '');
 
-        // Prioriza a busca por telefone se ele for válido (10 ou 11 dígitos)
+        // Cenário 1: Campo de nome está vazio. Mostra o próximo pedido.
+        if (name.length === 0) {
+            clearAutocomplete();
+            await displayNextUpcomingOrder();
+            return;
+        }
+
+        // Cenário 2: Campo de nome muito curto. Esconde tudo.
+        if (name.length < 2) {
+            clearAutocomplete();
+            hideClientSeal();
+            if (dom.pdvAiSuggestions?.container) dom.pdvAiSuggestions.container.classList.add('hidden');
+            return;
+        }
+
+        // Cenário 3: Telefone é válido. Busca por telefone tem prioridade.
         if (rawPhone.length >= 10) {
+            clearAutocomplete();
             const clientData = await findClientByPhone(phone);
             if (clientData) {
-                // Cliente encontrado: preenche o nome, exibe o selo e verifica dívidas.
                 if (!dom.customerName.value.trim()) {
                     dom.customerName.value = formatNameToTitleCase(clientData.name);
                 }
                 displayClientSeal(clientData);
                 checkExpiredDebtAndAlert(clientData);
+                displayLastOrderInfo(clientData); // Mostra a última compra
             } else {
-                // Telefone válido, mas cliente não encontrado: esconde o selo e sugere IA.
                 hideClientSeal();
-                generatePdvAISuggestion(null);
-            }
-        } else if (name.length >= 3) {
-            // Se o telefone não for válido, tenta buscar pelo nome
-            const clientData = await findClientByName(name);
-            if (clientData) {
-                // Cliente encontrado: preenche o telefone, exibe o selo e verifica dívidas.
-                if (!dom.customerPhone.value.trim()) {
-                    dom.customerPhone.value = clientData.phone || '';
-                    formatPhone({ target: dom.customerPhone });
-                }
-                displayClientSeal(clientData);
-                checkExpiredDebtAndAlert(clientData);
-            } else {
-                // Nome válido, mas cliente não encontrado: esconde o selo e sugere IA.
-                hideClientSeal();
-                generatePdvAISuggestion(null);
+                const clients = await searchClientsByName(name);
+                renderAutocompleteSuggestions(clients);
             }
         } else {
-            // Nenhum campo é válido o suficiente para uma busca. Limpa o estado.
-            hideClientSeal();
-            // Garante que a caixa de sugestão da IA seja escondida se nem o nome nem o telefone forem válidos para uma busca.
-            if (dom.pdvAiSuggestions?.container) dom.pdvAiSuggestions.container.classList.add('hidden');
+            // Cenário 4: Telefone inválido, busca por nome parcial.
+            const clients = await searchClientsByName(name);
+            renderAutocompleteSuggestions(clients);
         }
-    }, 750); // Atraso de 750ms para esperar o usuário parar de digitar.
+    }, 400); // Atraso de 400ms para uma resposta mais rápida.
 };
+
+// NOVO: Funções para a interface de autocompletar (serão implementadas depois)
+function renderAutocompleteSuggestions(clients) {
+    const container = document.getElementById('autocomplete-suggestions');
+    if (!container) return;
+
+    if (clients.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.innerHTML = clients.map(client => `
+        <div class="p-3 hover:bg-blue-100 cursor-pointer border-b border-gray-100" data-client-phone="${client.phone}" data-client-name="${client.name}">
+            <p class="font-semibold text-sm text-gray-800">${client.name}</p>
+            <p class="text-xs text-gray-500">${client.phone}</p>
+        </div>
+    `).join('');
+    container.classList.remove('hidden');
+}
+
+function clearAutocomplete() {
+    const container = document.getElementById('autocomplete-suggestions');
+    if (container) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+    }
+}
+
+async function handleSuggestionClick(clientName, clientPhone) {
+    clearAutocomplete();
+    dom.customerName.value = clientName;
+    dom.customerPhone.value = clientPhone;
+    formatPhone({ target: dom.customerPhone });
+
+    const clientData = await findClientByPhone(clientPhone);
+    if (clientData) {
+        displayClientSeal(clientData);
+        checkExpiredDebtAndAlert(clientData);
+        displayLastOrderInfo(clientData);
+    } else {
+        hideClientSeal();
+        await displayNextUpcomingOrder();
+    }
+}
+
 // Função para remover um item manual da interface e do pdvCurrentOrder
 function removeManualItem(itemId) {
     if (!pdvCurrentOrder || !pdvCurrentOrder.items) return;
@@ -389,8 +459,38 @@ export function getItemsFromUI() {
 
 // Inicia um novo pedido
 export async function startNewOrder() {
+    // NOVO: Lógica para iniciar pedido em modo offline
+    if (!isAppOnline()) {
+        console.log("startNewOrder (Offline): Iniciando novo pedido local.");
+        pdvCurrentOrder = {
+            orderNumber: `OFF-${Date.now().toString().slice(-6)}`, // Número temporário
+            customer: {},
+            delivery: {},
+            items: [],
+            total: 0,
+            sinal: 0,
+            restante: 0,
+            status: 'novo_offline', // Status específico para offline
+            paymentStatus: 'devedor',
+            createdBy: currentUser,
+            createdAt: new Date().toISOString() // Timestamp do cliente
+        };
+        clearForm();
+        calculateTotals();
+        if (dom.searchInput) {
+            dom.searchInput.value = "OFFLINE";
+        }
+        updateStatusLabel('novo_offline', 'Novo Pedido (Offline)');
+        if (dom.deliveryDate) {
+            dom.deliveryDate.value = getTodayDateString('yyyy-mm-dd');
+            updateWeekdayDisplay(dom.deliveryDate.value);
+        }
+        console.log("startNewOrder (Offline): Novo pedido local iniciado.");
+        return;
+    }
+
+    // Lógica online existente
     console.log("startNewOrder: Iniciando novo pedido.");
-    // PASSO 1: Apenas "espia" o próximo número para exibir na tela, sem consumi-lo.
     const nextOrderNum = await peekNextOrderNumber();
 
     pdvCurrentOrder = {
@@ -426,8 +526,8 @@ export async function startNewOrder() {
         // Esta chamada foi movida para o listener 'change' do deliveryDate
         // clearManuallyAddedTimeSlots(dom.deliveryDate.value); 
     }
-    // NOVO: Gera uma sugestão de IA ao iniciar um novo pedido
-    generatePdvAISuggestion(null); // Passa null para indicar novo cliente/pedido
+    // NOVO: Exibe a próxima entrega na caixa de sugestão
+    await displayNextUpcomingOrder();
     console.log("startNewOrder: Novo pedido iniciado com sucesso, exibindo o número: ", nextOrderNum);
 }
 
@@ -456,6 +556,7 @@ export async function loadOrderIntoForm(order) {
         }
     }
     if (dom.deliveryTime) { dom.deliveryTime.value = order.delivery?.time || ''; }
+    if (dom.orderObservations) { dom.orderObservations.value = order.observations || ''; } // NOVO: Carrega as observações
     if (dom.sinal) { dom.sinal.value = formatCurrency(order.sinal || 0).replace('R$ ', ''); }
     
     if (dom.otherProducts.manualItemsDisplay) {
@@ -496,12 +597,8 @@ export async function loadOrderIntoForm(order) {
         hideClientSeal();
     }
     
-    // NOVO: Gera uma sugestão de IA ao carregar um pedido existente
-    // NOTA: A lógica anterior foi movida para dentro da verificação do cliente para evitar conflitos com o selo.
-    // A função generatePdvAISuggestion agora é chamada apenas se o selo não for exibido.
-    // Se o cliente for encontrado e o selo for exibido, a sugestão da IA é escondida.
-    // Se o cliente não for encontrado, a sugestão da IA é exibida.
-    // O código acima já lida com essa lógica, então não precisamos de uma chamada explícita aqui.
+    // NOVO: Mostra a última compra do cliente carregado
+    displayLastOrderInfo(order);
     console.log("loadOrderIntoForm: Pedido carregado com sucesso.");
 }
 
@@ -510,6 +607,13 @@ async function saveOrder() {
     console.log("saveOrder: Tentando finalizar pedido...");
     calculateTotals();
     if (!validateForm(true)) return;
+
+    // NOVO: Se estiver offline, salva localmente e ignora a verificação de sobrecarga
+    if (!isAppOnline()) {
+        await _executeOfflineSave();
+        return;
+    }
+
 
     // --- LÓGICA DE VERIFICAÇÃO DE SOBRECARGA FINAL ---
     const deliveryDate = dom.deliveryDate.value;
@@ -546,6 +650,44 @@ async function saveOrder() {
     }
 }
 
+// NOVO: Função para salvar o pedido localmente quando offline
+async function _executeOfflineSave() {
+    console.log("MODO OFFLINE: Executando salvamento local.");
+    
+    const operatorName = dom.employeeSwitcherSelect.value;
+    let operator = employees.find(e => e.name === operatorName) || { ...currentUser, id: currentUser.id || 'gerencia_user' };
+    
+    const roundedSinal = roundSinal(parseCurrency(dom.sinal.value));
+    
+    const deliveryDateValue = dom.deliveryDate.value;
+    let deliveryDateFormatted = '';
+    if (deliveryDateValue) {
+        const [year, month, day] = deliveryDateValue.split('-');
+        deliveryDateFormatted = `${day}/${month}/${year}`;
+    }
+
+    // Monta o objeto do pedido com dados do formulário
+    const orderData = {
+        // Não inclui orderNumber, será gerado na sincronização
+        items: pdvCurrentOrder.items,
+        total: pdvCurrentOrder.total,
+        sinal: roundedSinal,
+        restante: pdvCurrentOrder.total - roundedSinal,
+        paymentStatus: (pdvCurrentOrder.total > 0 && (pdvCurrentOrder.total - roundedSinal) <= 0.01) ? 'pago' : 'devedor',
+        status: 'pendente_sync', // Status para identificar na sincronização
+        customer: { name: dom.customerName.value, phone: dom.customerPhone.value },
+        delivery: { date: deliveryDateFormatted, time: dom.deliveryTime.value.trim() },
+        observations: dom.orderObservations.value.trim() || null, // NOVO: Salva as observações
+        createdBy: { id: operator.id, name: operator.name, role: operator.role },
+        createdAt: new Date().toISOString() // Timestamp do cliente
+    };
+
+    queueOrderForSync(orderData);
+    
+    // Inicia um novo pedido offline
+    await startNewOrder();
+}
+
 // Lógica de salvamento real, separada para ser chamada após a verificação
 async function _executeSaveOrder() {
     // Isso garante que o número só seja consumido se o pedido for realmente salvo.
@@ -572,9 +714,18 @@ async function _executeSaveOrder() {
     // para evitar problemas de fuso horário que salvavam o pedido no dia anterior.
     const deliveryDateValue = dom.deliveryDate.value;
     let deliveryDateFormatted = '';
-    if (deliveryDateValue) {
+    let deliveryTimestamp = null;
+    const deliveryTimeValue = dom.deliveryTime.value.trim();
+
+    if (deliveryDateValue && deliveryTimeValue) {
         const [year, month, day] = deliveryDateValue.split('-');
         deliveryDateFormatted = `${day}/${month}/${year}`;
+
+        const [hours, minutes] = deliveryTimeValue.split(':');
+        if (hours && minutes) {
+            const jsDate = new Date(year, month - 1, day, hours, minutes);
+            deliveryTimestamp = Timestamp.fromDate(jsDate);
+        }
     }
 
     const orderData = {
@@ -586,9 +737,11 @@ async function _executeSaveOrder() {
         customer: { name: dom.customerName.value, phone: dom.customerPhone.value }, 
         // Usa a data formatada corretamente, garantindo que "29/07/2024" seja salvo como "29/07/2024"
         // CORREÇÃO: Adiciona .trim() para remover espaços em branco antes de salvar.
-        delivery: { date: deliveryDateFormatted, time: dom.deliveryTime.value.trim() },
+        delivery: { date: deliveryDateFormatted, time: deliveryTimeValue },
         createdBy: { id: operator.id, name: operator.name, role: operator.role },
-        createdAt: serverTimestamp()
+        observations: dom.orderObservations.value.trim() || null, // NOVO: Salva as observações
+        createdAt: serverTimestamp(),
+        deliveryTimestamp: deliveryTimestamp // NOVO: Adiciona o timestamp para ordenação
     };
     console.log("saveOrder: Dados do pedido a serem salvos:", orderData);
     try {
@@ -703,9 +856,18 @@ async function _executeupdateOrder() {
     // para evitar problemas de fuso horário que salvavam o pedido no dia anterior.
     const deliveryDateValue = dom.deliveryDate.value;
     let deliveryDateFormatted = '';
-    if (deliveryDateValue) {
+    let deliveryTimestamp = null;
+    const deliveryTimeValue = dom.deliveryTime.value.trim();
+
+    if (deliveryDateValue && deliveryTimeValue) {
         const [year, month, day] = deliveryDateValue.split('-');
         deliveryDateFormatted = `${day}/${month}/${year}`;
+
+        const [hours, minutes] = deliveryTimeValue.split(':');
+        if (hours && minutes) {
+            const jsDate = new Date(year, month - 1, day, hours, minutes);
+            deliveryTimestamp = Timestamp.fromDate(jsDate);
+        }
     }
 
     const orderData = {
@@ -715,9 +877,11 @@ async function _executeupdateOrder() {
         customer: { name: dom.customerName.value, phone: dom.customerPhone.value }, 
         // Usa a data formatada corretamente, garantindo que "29/07/2024" seja salvo como "29/07/2024"
         // CORREÇÃO: Adiciona .trim() para remover espaços em branco antes de salvar.
-        delivery: { date: deliveryDateFormatted, time: dom.deliveryTime.value.trim() },
+        delivery: { date: deliveryDateFormatted, time: deliveryTimeValue },
         updatedAt: serverTimestamp(),
-        updatedBy: { id: operator.id, name: operator.name, role: operator.role }
+        observations: dom.orderObservations.value.trim() || null, // NOVO: Salva as observações
+        updatedBy: { id: operator.id, name: operator.name, role: operator.role },
+        deliveryTimestamp: deliveryTimestamp // NOVO: Adiciona o timestamp para ordenação
     };
 
     // Acessa firebase.firestore.FieldValue.delete() via db
@@ -855,6 +1019,7 @@ function clearForm() {
     if (dom.deliveryDate) { dom.deliveryDate.value = ''; }
     if (dom.deliveryDateWeekday) { dom.deliveryDateWeekday.textContent = ''; }
     if (dom.deliveryTime) { dom.deliveryTime.value = ''; }
+    if (dom.orderObservations) { dom.orderObservations.value = ''; } // NOVO: Limpa o campo de observações
     if (dom.sinal) { dom.sinal.value = '0,00'; }
     document.querySelectorAll('.product-quantity').forEach(input => input.value = '0');
     if (dom.otherProducts && dom.otherProducts.manualDesc) { dom.otherProducts.manualItemsDisplay.innerHTML = ''; }
@@ -866,9 +1031,20 @@ function clearForm() {
     if (dom.pdvAiSuggestions?.container) {
         dom.pdvAiSuggestions.container.classList.add('hidden');
     }
-    // NOVO: Esconde o selo do cliente ao limpar o formulário
     hideClientSeal();
+    clearAutocomplete();
     console.log("clearForm: Formulário limpo.");
+}
+
+/**
+ * NOVO: Limpa o campo de nome do cliente e aciona a lógica para mostrar o próximo pedido.
+ */
+function clearCustomerNameAndSuggest() {
+    if (dom.customerName) {
+        dom.customerName.value = '';
+        // Aciona o evento de input para que o debouncedClientLookup seja chamado
+        dom.customerName.dispatchEvent(new Event('input', { bubbles: true }));
+    }
 }
 /**
  * Valida o nome do cliente.
@@ -944,7 +1120,6 @@ function validateForm(isNewOrder) {
         //    'yyyy-MM-dd HH:mm' informa ao  exatamente como interpretar a string.
         //    O 'new Date()' é a data de referência, garantindo que a análise seja consistente.
         const deliveryDateTime = dateFns.parse(combinedStr, 'yyyy-MM-dd HH:mm', new Date());
-        // Correto: 'HH' Essa pequena alteração fará com que 12:00 seja corretamente interpretado como meio-dia, e a sua lógica de validação funcionará como esperado.
         
         // 3. Cria a data/hora atual com uma tolerância para evitar erros por segundos.
         //    Subtrai 5 minutos do tempo atual, então um pedido para "agora" ainda é válido.
@@ -1003,36 +1178,44 @@ export function updateStatusLabel(status, text) {
 // Atualiza o estado dos botões do PDV
 export function updateButtonStates() {
     if (!pdvCurrentOrder) return;
-    const isNew = pdvCurrentOrder.status === 'novo';
+
+    const isOffline = !isAppOnline();
+    const isNew = pdvCurrentOrder.status === 'novo' || pdvCurrentOrder.status === 'novo_offline';
     const isActive = ['ativo', 'alterado'].includes(pdvCurrentOrder.status);
     const isCancelled = pdvCurrentOrder.status === 'cancelado';
     const isPaid = pdvCurrentOrder.paymentStatus === 'pago';
     
     const buttonsToCheck = [
         dom.btnFechar, dom.btnAtualizar, dom.btnCancelar,
-        dom.btnComprovante, dom.liquidarBtn
+        dom.btnComprovante, dom.liquidarBtn,
+        // NOVO: Adiciona botões de navegação à verificação
+        dom.btnAnterior, dom.btnProximo, dom.searchBtn
     ];
 
     buttonsToCheck.forEach(btn => {
         if (btn) {
             let disabled = false;
             let title = '';
-
+            
             if (btn === dom.btnFechar) {
-                disabled = !isNew;
+                disabled = !isNew; // Funciona para novo e novo_offline
                 title = 'Finalizar Pedido';
             } else if (btn === dom.btnAtualizar) {
-                disabled = !isActive;
-                title = 'Atualizar Pedido';
+                disabled = !isActive || isOffline; // Desabilita se offline
+                title = isOffline ? 'Função indisponível offline' : 'Atualizar Pedido';
             } else if (btn === dom.btnCancelar) {
-                disabled = !isActive;
-                title = 'Cancelar Pedido';
+                disabled = !isActive || isOffline; // Desabilita se offline
+                title = isOffline ? 'Função indisponível offline' : 'Cancelar Pedido';
             } else if (btn === dom.btnComprovante) {
-                disabled = isNew || isCancelled;
+                // Permite comprovante para pedidos offline já salvos, mas não para um novo
+                disabled = pdvCurrentOrder.status === 'novo' || pdvCurrentOrder.status === 'novo_offline' || isCancelled;
                 title = 'Gerar Comprovante';
             } else if (btn === dom.liquidarBtn) {
-                disabled = !isActive || isPaid;
-                title = 'Liquidar Saldo';
+                disabled = !isActive || isPaid || isOffline; // Desabilita se offline
+                title = isOffline ? 'Função indisponível offline' : 'Liquidar Saldo';
+            } else if (btn === dom.btnAnterior || btn === dom.btnProximo || btn === dom.searchBtn) {
+                disabled = isOffline;
+                title = isOffline ? 'Busca de pedidos indisponível offline' : 'Navegar/Buscar Pedidos';
             }
             
             btn.disabled = disabled;
@@ -1064,26 +1247,24 @@ export function updatePaymentStatus(restante, total, sinal) {
 // Mostra o modal de lembrete de produção
 export function showReminderModal(orders) {
     console.log("showReminderModal: Exibindo modal de lembrete de produção.");
-    const requiredElements = [
-        dom.reminder.modal,
-        dom.reminder.date,
-        dom.reminder.summaryItems,
-        dom.reminder.ordersList,
-        dom.reminder.closeBtn,
-        dom.reminder.printBtn
-    ];
+    const { modal, date, summaryItems, ordersList, closeBtn, printBtn, weekdayHighlight, title } = dom.reminder;
 
-    const allElementsFound = requiredElements.every(el => el !== null && el !== undefined);
-
-    if (!allElementsFound) {
-        console.error("showReminderModal: Um ou mais elementos do modal de lembrete não foram encontrados. Verifique os IDs no HTML e a inicialização do objeto 'dom'.");
-        requiredElements.forEach((el, index) => {
-            if (el === null || el === undefined) {
-                const propName = Object.keys(dom.reminder).find(key => dom.reminder[key] === el);
-                console.error(`Elemento do modal de lembrete essencial não encontrado: dom.reminder.${propName}`);
-            }
-        });
+    // CORREÇÃO: Verifica os elementos essenciais e permite que a função continue mesmo se os opcionais (título/dia da semana) estiverem faltando.
+    if (!modal || !date || !summaryItems || !ordersList || !closeBtn || !printBtn) {
+        console.error("showReminderModal: Elementos essenciais do modal de lembrete não foram encontrados.");
         return;
+    }
+
+    // Atualiza os elementos visuais opcionais apenas se eles existirem.
+    if (weekdayHighlight && title) {
+        const weekdays = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
+        const today = new Date();
+        weekdayHighlight.textContent = weekdays[today.getDay()];
+        title.textContent = 'Lembrete de Produção (HOJE)';
+    } else {
+        // Fallback para o título antigo se os novos elementos não existirem
+        const mainTitle = document.querySelector('#reminder-modal h2');
+        if (mainTitle) mainTitle.textContent = 'Lembrete de Produção (Hoje)';
     }
 
     currentReminderOrders.splice(0, currentReminderOrders.length, ...orders); // Atualiza a variável global no app.js
@@ -1276,7 +1457,7 @@ function displayClientSeal(clientData) {
     // Verifica se há pedidos e se o último pedido tem itens
     if (clientData.orders && clientData.orders.length > 0 && clientData.orders[0].items) {
         const lastOrder = clientData.orders[0]; // O orders já vem ordenado do mais recente para o mais antigo
-        lastOrderSalgados = getSalgadosCountFromItems(lastOrder.items); // Usa a função de utilitários
+        lastOrderSalgados = getSalgadosCountFromItems(lastOrder.items || []); // Usa a função de utilitários
     }
     clientSince.textContent = `${lastOrderSalgados} Salgados`; // Atualiza o texto do selo
     clientSince.title = `Última compra: ${lastOrderSalgados} salgados`; // Adiciona um tooltip para clareza
@@ -1314,89 +1495,69 @@ function hideClientSeal() {
 }
 
 /**
- * NOVO: Gera uma sugestão de IA para o PDV com base no contexto atual.
- * @param {object|null} clientData O objeto completo do cliente, se disponível.
+ * NOVO: Mostra informações sobre a próxima entrega agendada.
  */
-function generatePdvAISuggestion(clientData = null) {
-    const { container, text: suggestionTextEl, loader } = dom.pdvAiSuggestions;
-    if (!container || !suggestionTextEl || !loader) {
-        console.warn("Elementos da sugestão da IA no PDV não encontrados. Funcionalidade desativada.");
-        return;
-    }
+async function displayNextUpcomingOrder() {
+    const suggestionContainer = dom.pdvAiSuggestions?.container;
+    const suggestionTextEl = dom.pdvAiSuggestions?.text;
+    const loader = dom.pdvAiSuggestions?.loader;
 
-    // Limpa qualquer chamada anterior que ainda não tenha sido executada
-    clearTimeout(suggestionDebounceTimer);
+    if (!suggestionContainer || !suggestionTextEl || !loader) return;
 
-    // NOVO: Esconde o selo do cliente quando a caixa de sugestão da IA é exibida.
-    hideClientSeal(); 
-
-    // Mostra o loader imediatamente para uma melhor experiência do usuário
-    container.classList.remove('hidden');
-    suggestionTextEl.innerHTML = '';
+    hideClientSeal();
+    suggestionContainer.classList.remove('hidden');
     loader.classList.remove('hidden');
+    suggestionTextEl.innerHTML = '';
 
-    // Agenda a execução da chamada à IA para daqui a 500ms
-    suggestionDebounceTimer = setTimeout(async () => {
-        let prompt = `Você é um assistente de vendas da Ice Kiss. Forneça uma sugestão curta e útil para o atendente, baseada no contexto abaixo. Seja direto e use no máximo 2 frases.`;
-        
-        if (clientData && clientData.orderCount > 0) {
-            // Cliente recorrente
-            prompt += `\n\nEste é um cliente recorrente: ${clientData.name}.`;
-            prompt += ` Ele já fez ${clientData.orderCount} pedidos.`;
-            if (clientData.totalDebt > 0) {
-                prompt += ` Ele tem um débito de ${formatCurrency(clientData.totalDebt)}.`;
-                prompt += ` Sugira como abordar a dívida ou como oferecer um desconto para quitar.`;
-            } else {
-                prompt += ` Ele é um bom pagador. Sugira um produto complementar ou uma oferta para fidelizar.`;
-                // Se houver histórico de produtos mais comprados, adicione ao prompt
-                if (clientData.orders && clientData.orders.length > 0) {
-                    const productFrequency = {};
-                    clientData.orders.forEach(order => {
-                        (order.items || []).forEach(item => {
-                            const productName = item.isManual ? item.name : getProductInfoById(item.id)?.name;
-                            if (productName) {
-                                productFrequency[productName] = (productFrequency[productName] || 0) + item.quantity;
-                            }
-                        });
-                    });
-                    const sortedProducts = Object.entries(productFrequency).sort((a,b) => b[1] - a[1]);
-                    if (sortedProducts.length > 0) {
-                        prompt += ` Ele costuma comprar ${sortedProducts[0][0]}.`;
-                    }
-                }
-            }
+    try {
+        const nextOrder = await fetchNextUpcomingOrder();
+        if (nextOrder) {
+            const totalSalgados = getSalgadosCountFromItems(nextOrder.items || []);
+            suggestionTextEl.innerHTML = `
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-forward text-blue-500 mr-2"></i>
+                    <h4 class="font-semibold text-blue-800">Próxima Entrega</h4>
+                </div>
+                <p class="text-sm text-gray-700">
+                    <strong>Cliente:</strong> ${nextOrder.customer?.name || 'N/A'}<br>
+                    <strong>Horário:</strong> ${nextOrder.delivery?.time || 'N/A'} (${nextOrder.delivery?.date || ''})<br>
+                    <strong>Total:</strong> ${totalSalgados} salgados
+                </p>
+            `;
         } else {
-            // Novo cliente ou cliente sem histórico de pedidos
-            prompt += `\n\nEste é um cliente novo ou sem histórico. Sugira uma saudação de boas-vindas ou uma oferta inicial.`;
+            suggestionTextEl.innerHTML = `<i class="fas fa-info-circle mr-2 text-gray-500"></i><span class="text-gray-700">Nenhuma entrega futura agendada.</span>`;
         }
-
-        try {
-            console.log("generatePdvAISuggestion (debounced): Chamando IA com prompt:", prompt);
-            const aiResponse = await generatePdvSuggestion(prompt); // Esta é a chamada para o aiService
-            
-            if (aiResponse) {
-                suggestionTextEl.innerHTML = marked.parse(aiResponse);
-            } else {
-                // NOVO: Se a resposta for null (IA indisponível), exibe informação do próximo pedido
-                // Busca o próximo pedido pendente para exibir no lugar da sugestão da IA
-                const nextOrders = currentReminderOrders.filter(order => order.status !== 'cancelado' && order.delivery?.date === getTodayDateString('dd/mm/yyyy'));
-                if (nextOrders.length > 0) {
-                    const nextOrder = nextOrders[0];
-                    const totalSalgadosNextOrder = getSalgadosCountFromItems(nextOrder.items || []);
-                    suggestionTextEl.innerHTML = `<i class="fas fa-info-circle mr-2 text-blue-500"></i><span class="text-blue-700">Próximo pedido: #${nextOrder.orderNumber} para ${nextOrder.customer?.name || 'N/A'} às ${nextOrder.delivery?.time || 'N/A'} (${totalSalgadosNextOrder} salgados).</span>`;
-                } else {
-                    suggestionTextEl.innerHTML = `<i class="fas fa-info-circle mr-2 text-gray-500"></i><span class="text-gray-700">Nenhum pedido pendente para hoje.</span>`;
-                }
-            }
-        } catch (error) {
-            console.error("Erro ao gerar sugestão da IA para o PDV (debounced):", error);
-            // CORREÇÃO: Exibe mensagem de erro mais explícita
-            suggestionTextEl.innerHTML = `<i class="fas fa-exclamation-triangle mr-2 text-red-500"></i><span class="text-red-700">Erro ao gerar sugestão da IA. Por favor, verifique sua conexão ou tente novamente.</span>`;
-        } finally {
-            loader.classList.add('hidden');
-        }
-    }, 500); // Atraso de 500ms para evitar chamadas em rajada
+    } catch (error) {
+        console.error("Erro ao buscar próximo pedido:", error);
+        suggestionTextEl.innerHTML = `<i class="fas fa-exclamation-triangle mr-2 text-red-500"></i><span class="text-red-700">Erro ao buscar dados da próxima entrega.</span>`;
+    } finally {
+        loader.classList.add('hidden');
+    }
 }
+
+/**
+ * NOVO: Mostra informações sobre a última compra de um cliente.
+ * @param {object} clientData - Objeto do cliente com seu histórico de pedidos.
+ */
+function displayLastOrderInfo(clientData) {
+    const suggestionContainer = dom.pdvAiSuggestions?.container;
+    const suggestionTextEl = dom.pdvAiSuggestions?.text;
+    if (!suggestionContainer || !suggestionTextEl) return;
+
+    suggestionContainer.classList.remove('hidden');
+
+    if (clientData && clientData.orders && clientData.orders.length > 0) {
+        const lastOrder = clientData.orders[0];
+        const lastOrderDate = formatDateToBR(lastOrder.createdAt);
+        const lastOrderItems = (lastOrder.items || []).map(item => `${item.quantity}x ${item.name}`).join(', ');
+
+        suggestionTextEl.innerHTML = `<div class="flex items-center mb-2"><i class="fas fa-history text-purple-500 mr-2"></i><h4 class="font-semibold text-purple-800">Última Compra (${lastOrderDate})</h4></div><p class="text-sm text-gray-700"><strong>Itens:</strong> ${lastOrderItems || 'N/A'}<br><strong>Valor:</strong> ${formatCurrency(lastOrder.total)}</p>`;
+    } else {
+        suggestionTextEl.innerHTML = `<i class="fas fa-info-circle mr-2 text-gray-500"></i><span class="text-gray-700">Este é o primeiro pedido deste cliente.</span>`;
+    }
+}
+
+
 
 /**
  * Interpreta uma string de data de forma robusta, tentando múltiplos formatos.
@@ -1477,7 +1638,6 @@ function checkExpiredDebtAndAlert(clientData) {
     }
 }
 
-
 // Configura os event listeners globais e do PDV
 export function setupPdvEventListeners() {
     console.log("setupPdvEventListeners: Configurando listeners de eventos do PDV.");
@@ -1494,7 +1654,7 @@ export function setupPdvEventListeners() {
         dom.pdvEmployeeOnlineStatus,
         dom.deliveryDateWeekday, dom.sinalLabel, dom.restanteLabel,
         // NOVO: Elementos da IA
-        dom.pdvAiSuggestions?.container, dom.pdvAiSuggestions?.text, dom.pdvAiSuggestions?.loader
+        // REMOVIDO: Os elementos da IA PDV foram removidos da verificação, pois a caixa de sugestões foi retirada da tela.
     ];
 
     const allPdvElementsFound = essentialPdvElements.every(el => el !== null && el !== undefined);
@@ -1503,13 +1663,26 @@ export function setupPdvEventListeners() {
         console.error("setupPdvEventListeners: Um ou mais elementos DOM essenciais do PDV não foram encontrados. Event listeners não serão configurados.");
         essentialPdvElements.forEach(el => {
             if (el === null || el === undefined) {
-                const propName = Object.keys(dom).find(key => dom[key] === el) || Object.keys(dom.pdvAiSuggestions).find(key => dom.pdvAiSuggestions[key] === el);
-                console.error(`Elemento PDV essencial não encontrado: dom.reminder.${propName}`);
+                // CORREÇÃO: Lógica de log aprimorada para encontrar o nome correto da propriedade.
+                const findPropName = (obj, val) => Object.keys(obj).find(key => obj[key] === val);
+                let propName = findPropName(dom, el);
+                let parentObjName = 'dom';
+
+                if (!propName) {
+                    for (const key in dom) {
+                        if (typeof dom[key] === 'object' && dom[key] !== null && findPropName(dom[key], el)) {
+                            propName = findPropName(dom[key], el);
+                            parentObjName = `dom.${key}`;
+                            break;
+                        }
+                    }
+                }
+                console.error(`Elemento PDV essencial não encontrado: ${parentObjName}.${propName || 'desconhecido'}`);
             }
         });
         return;
     }
-
+    
     dom.pdvCardapioContainer.addEventListener("input", e => {
         if (e.target.matches(".product-quantity")) {
             calculateTotals();
@@ -1527,8 +1700,13 @@ export function setupPdvEventListeners() {
     // debounced para evitar chamadas excessivas à API e o erro 429.
     dom.customerName.addEventListener("input", debouncedClientLookup);
     dom.customerName.addEventListener("blur", (e) => {
-        // Mantém a formatação do nome ao sair do campo.
+        // Formata o nome para o padrão "Nome Sobrenome" ao sair do campo.
         e.target.value = formatNameToTitleCase(e.target.value);
+
+        // Esconde o autocompletar após um pequeno atraso para permitir o clique na sugestão.
+        setTimeout(() => {
+            clearAutocomplete();
+        }, 200);
     });
 
     dom.customerPhone.addEventListener("input", (e) => {
@@ -1541,6 +1719,19 @@ export function setupPdvEventListeners() {
         // NOVO: A função openInteractiveTimeSelector em manager.js agora gerencia a limpeza
         // dos horários manuais ao detectar uma mudança de data.
     });
+
+    // NOVO: Listener para o autocompletar (usando delegação de eventos)
+    const suggestionsContainer = document.getElementById('autocomplete-suggestions');
+    if (suggestionsContainer) {
+        suggestionsContainer.addEventListener('mousedown', (e) => { // mousedown dispara antes do blur do input
+            const suggestionEl = e.target.closest('[data-client-phone]');
+            if (suggestionEl) {
+                const name = suggestionEl.dataset.clientName;
+                const phone = suggestionEl.dataset.clientPhone;
+                handleSuggestionClick(name, phone);
+            }
+        });
+    }
     
     dom.deliveryTime.addEventListener("input", formatTime);
     dom.btnNovo.addEventListener("click", startNewOrder);

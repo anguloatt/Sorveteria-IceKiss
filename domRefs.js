@@ -39,6 +39,7 @@ export const dom = {
     deliveryDate: document.getElementById('delivery-date'),
     deliveryDateWeekday: document.getElementById('delivery-date-weekday'),
     deliveryTime: document.getElementById('delivery-time'),
+    orderObservations: document.getElementById('order-observations'),
     sinal: document.getElementById('sinal-input'),
     totalValue: document.getElementById('total-value'),
     restanteValue: document.getElementById('restante-value'),
@@ -120,6 +121,7 @@ export const dom = {
         dailySummaryDate: document.getElementById('daily-summary-date'),
         dailySummaryContent: document.getElementById('daily-summary-content'),
         totalSalgadosProducao: document.getElementById('total-salgados-producao'),
+        printTomorrowReminderBtn: document.getElementById('print-tomorrow-reminder-btn'),
     },
     
     // Meu Modal de WhatsApp
@@ -209,7 +211,7 @@ export const dom = {
         saveGoalBtn: document.getElementById('manager-save-goal-btn'),
         changePassNew: document.getElementById('manager-change-pass-new'),
         changePassConfirm: document.getElementById('manager-change-pass-confirm'),
-        saveNewPassSystemBtn: document.getElementById('manager-save-new-pass-btn'),
+        saveNewPassSystemBtn: document.getElementById('manager-save-new-pass-system-btn'),
         firebaseAccessBtn: document.getElementById('firebase-access-btn'),
         riskZone: document.getElementById('manager-risk-zone'),
         clearDataConfirmInput: document.getElementById('clear-data-confirm-input'),
@@ -293,5 +295,14 @@ export const dom = {
         modal: document.getElementById('expired-orders-alert-modal'),
         list: document.getElementById('expired-orders-list'),
         closeBtn: document.getElementById('expired-orders-alert-close-btn'),
+    },
+    // Meu Modal de Lembrete de Amanhã (NOVO)
+    tomorrowReminder: {
+        modal: document.getElementById('tomorrow-reminder-modal'),
+        date: document.getElementById('tomorrow-reminder-date'),
+        summaryItems: document.getElementById('tomorrow-reminder-summary-items'),
+        ordersList: document.getElementById('tomorrow-reminder-orders-list'),
+        closeBtn: document.getElementById('tomorrow-reminder-close-btn'),
+        printBtn: document.getElementById('tomorrow-reminder-print-btn'),
     },
 };

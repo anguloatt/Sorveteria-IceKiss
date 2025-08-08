@@ -79,7 +79,7 @@ export async function addEmployee(name, role) {
         return;
     }
     const formattedName = formatNameToTitleCase(name);
-    const confirmAdd = await showCustomConfirm("Adicionar Funcionário", `Adicionar "${formattedName}" com o cargo de "${role}"? A senha inicial será "123".`);
+    const confirmAdd = await showCustomConfirm("Adicionar Funcionário", `Adicionar "${formattedName}" com o cargo de "${role}"? A senha inicial será "1234".`);
     if (!confirmAdd) return;
 
     try {
@@ -122,7 +122,7 @@ export async function editEmployee(employeeId, newName, newRole) {
  * Minha função para resetar a senha de um funcionário.
  */
 export async function resetEmployeePassword(employeeId, employeeName) {
-    const confirmReset = await showCustomConfirm("Resetar Senha", `Tem certeza que deseja resetar a senha de "${employeeName}" para "123"?`);
+    const confirmReset = await showCustomConfirm("Resetar Senha", `Tem certeza que deseja resetar a senha de "${employeeName}" para "1234"?`);
     if (!confirmReset) return;
 
     try {
@@ -165,8 +165,9 @@ export function renderEmployeesManagerTab(allOrders = []) {
     if (allOrders.length > 0) {
         allOrders.forEach(order => {
             const employeeName = order.createdBy?.name;
-            if (employeeName) {
-                const orderDate = order.createdAt.toDate();
+            // PADRONIZAÇÃO: order.createdAt já é um objeto Date, não precisa de .toDate().
+            if (employeeName && order.createdAt instanceof Date) {
+                const orderDate = order.createdAt;
                 // Se o funcionário não está no mapa ou a data do pedido atual é mais recente, eu atualizo o mapa.
                 if (!lastActivityMap.has(employeeName) || orderDate > lastActivityMap.get(employeeName)) {
                     lastActivityMap.set(employeeName, orderDate);
@@ -198,7 +199,8 @@ function createEmployeeRow(employee, lastActivityMap) {
     const roleText = roleMap[employee.role] || employee.role;
 
     // Determino a data da atividade mais recente, comparando o último login com o último pedido.
-    const lastLoginDate = employee.lastLogin ? employee.lastLogin.toDate() : null;
+    // PADRONIZAÇÃO: employee.lastLogin já é um objeto Date, não precisa de .toDate().
+    const lastLoginDate = employee.lastLogin instanceof Date ? employee.lastLogin : null;
     const lastOrderDate = lastActivityMap.get(employee.name);
 
     const mostRecentActivityDate = (lastLoginDate && lastOrderDate) ? (lastLoginDate > lastOrderDate ? lastLoginDate : lastOrderDate) : (lastLoginDate || lastOrderDate);

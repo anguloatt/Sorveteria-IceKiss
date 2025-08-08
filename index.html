@@ -103,6 +103,13 @@
                     <select id="employee-switcher-select" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </select>
                     <span id="pdv-employee-online-status" class="text-sm font-semibold online-indicator hidden">Online</span>
+                    <span id="offline-indicator" class="hidden items-center gap-2 text-sm font-semibold text-red-600 ml-2 animate-pulse"><i class="fas fa-cloud"></i> Offline</span>
+                    <!-- NOVO: Contador de pedidos pendentes -->
+                    <span id="pending-orders-counter" class="hidden items-center gap-1 text-sm font-semibold text-amber-600 ml-2">
+                        <i class="fas fa-sync fa-spin"></i>
+                        <span id="pending-orders-count">0</span>
+                        <span>pendente(s)</span>
+                    </span>
                     <button id="change-password-btn" class="text-gray-500 hover:text-blue-600 text-lg" title="Alterar Senha"><i class="fas fa-key"></i></button>
                 </div>
                 <button id="manager-access-btn" class="text-gray-600 hover:text-orange-600 text-2xl" title="Acesso Gerencial Rápido"><i class="fas fa-user-shield pointer-events-none"></i></button>
@@ -131,8 +138,12 @@
                 <div class="flex flex-col md:flex-row gap-4 items-stretch"> 
                     <div class="bg-white rounded-2xl shadow-lg p-6 flex-1"> 
                         <h2 class="text-lg font-semibold mb-3 border-b pb-2">Dados do Cliente</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input type="text" id="customer-name" placeholder="Nome e Sobrenome" class="px-4 py-2 border border-gray-300 rounded-lg text-base">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> 
+                            <!-- NOVO: Adicionado um container 'relative' para posicionar as sugestões -->
+                            <div class="relative">
+                                <input type="text" id="customer-name" placeholder="Nome e Sobrenome" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-base" autocomplete="off">
+                                <div id="autocomplete-suggestions" class="absolute z-20 w-full bg-white border border-gray-300 rounded-b-lg shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                            </div>
                             <input type="text" id="customer-phone" placeholder="Telefone com DDD" class="px-4 py-2 border border-gray-300 rounded-lg text-base">
                             <div class="flex items-center">
                                 <input type="date" id="delivery-date" class="px-4 py-2 border border-gray-300 rounded-lg text-base w-1/2">
@@ -144,6 +155,9 @@
                                     <i class="fas fa-times-circle pointer-events-none"></i>
                                 </button>
                             </div>
+                        </div>
+                        <div class="mt-4">
+                            <textarea id="order-observations" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-base" placeholder="Observações do Pedido Ex: Cliente pediu para caprichar no recheio..."></textarea>
                         </div>
                         <div id="client-history-heading" class="mt-4 mb-2 hidden">
                             <h3 class="text-md font-semibold text-gray-700">Histórico Cliente</h3>
@@ -162,17 +176,6 @@
                                     <i class="fas fa-cookie-bite text-xl mb-1"></i>
                                     <p id="seal-client-since" class="font-bold">--</p>
                                 </div>
-                            </div>
-                        </div>
-                        <div id="pdv-ai-suggestions" class="hidden mt-4 p-3 bg-purple-50 border-l-4 border-purple-500 rounded-lg">
-                            <div class="flex items-center mb-2">
-                                <i class="fas fa-magic text-purple-600 mr-2"></i>
-                                <h3 class="font-semibold text-purple-800">IA PDV</h3>
-                            </div>
-                            <p id="pdv-ai-suggestion-text" class="text-sm text-purple-700 leading-relaxed"></p>
-                            <div id="pdv-ai-suggestion-loader" class="hidden flex items-center justify-center mt-2 text-purple-600">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>
-                                <span class="text-sm">Gerando sugestão...</span>
                             </div>
                         </div>
                     </div>
@@ -238,6 +241,9 @@
                     </div>
                     <div id="live-order-items" class="flex-1 overflow-y-auto space-y-2 pr-2">
                         <p id="live-order-placeholder" class="text-center text-gray-400 italic mt-10">Adicione itens para visualizá-los aqui.</p>
+                    </div>
+                    <div id="live-order-kibe-warning" class="hidden text-center font-bold text-orange-600 bg-orange-100 p-2 rounded-lg mt-2 animate-pulse">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> * KIBE *
                     </div>
                     <div class="border-t mt-3 pt-3 text-right">
                         <span class="text-gray-600 font-medium">Total de Salgados:</span>
@@ -517,26 +523,40 @@
                         </div>
                     </div>
                      <!-- View: Impressão -->
-                    <div id="view-impressao" class="hidden bg-white p-6 rounded-xl shadow-lg">
-                        <div class="lg:flex lg:space-x-8 lg:items-start">
-                            <div class="space-y-6 lg:w-1/2">
-                                <div><label for="manager-store-name" class="block font-semibold mb-1">Nome da Loja (Cabeçalho)</label><input type="text" id="manager-store-name" class="w-full px-4 py-2 border rounded-lg"></div>
-                                <div><label for="manager-store-phone" class="block font-semibold mb-1">Telefone da Loja (Cabeçalho)</label><input type="text" id="manager-store-phone" class="w-full px-4 py-2 border rounded-lg"></div>
-                                <div><label for="manager-ticket-title" class="block font-semibold mb-1">Título do Comprovante</label><input type="text" id="manager-ticket-title" class="w-full px-4 py-2 border rounded-lg" placeholder="Ex: COMPROVANTE DE PEDIDO"></div>
-                                <div><label for="manager-ticket-subtitle" class="block font-semibold mb-1">Subtítulo do Comprovante</label><input type="text" id="manager-ticket-subtitle" class="w-full px-4 py-2 border rounded-lg" placeholder="Ex: (NAO E DOCUMENTO FISCAL)"></div>
-                                <div>
-                                    <label for="manager-footer-msg" class="block font-semibold mb-1">Mensagem de Rodapé</label>
-                                    <textarea id="manager-footer-msg" class="w-full px-4 py-2 border rounded-lg" rows="5" placeholder="Ex: Obrigado pela compra! Volte sempre!"></textarea>
+                    <div id="view-impressao" class="hidden space-y-8">
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Configurações do Ticket de Impressão</h3>
+                            <div class="lg:flex lg:space-x-8 lg:items-start">
+                                <div class="space-y-6 lg:w-1/2">
+                                    <div><label for="manager-store-name" class="block font-semibold mb-1">Nome da Loja (Cabeçalho)</label><input type="text" id="manager-store-name" class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label for="manager-store-phone" class="block font-semibold mb-1">Telefone da Loja (Cabeçalho)</label><input type="text" id="manager-store-phone" class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label for="manager-ticket-title" class="block font-semibold mb-1">Título do Comprovante</label><input type="text" id="manager-ticket-title" class="w-full px-4 py-2 border rounded-lg" placeholder="Ex: COMPROVANTE DE PEDIDO"></div>
+                                    <div><label for="manager-ticket-subtitle" class="block font-semibold mb-1">Subtítulo do Comprovante</label><input type="text" id="manager-ticket-subtitle" class="w-full px-4 py-2 border rounded-lg" placeholder="Ex: (NAO E DOCUMENTO FISCAL)"></div>
+                                    <div>
+                                        <label for="manager-footer-msg" class="block font-semibold mb-1">Mensagem de Rodapé</label>
+                                        <textarea id="manager-footer-msg" class="w-full px-4 py-2 border rounded-lg" rows="5" placeholder="Ex: Obrigado pela compra! Volte sempre!"></textarea>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <input type="checkbox" id="manager-print-unit-price" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <label for="manager-print-unit-price" class="block font-semibold">Exibir valor unitário do salgado no ticket</label>
+                                    </div>
+                                    <div class="border-t pt-4 mt-4">
+                                        <label for="manager-kibe-print-size" class="block font-semibold mb-1">Destaque "KIBE" (se houver no pedido)</label>
+                                        <select id="manager-kibe-print-size" class="w-full px-4 py-2 border rounded-lg bg-gray-50">
+                                            <option value="disabled">Desativado</option>
+                                            <option value="1x">Tamanho 1 (Normal)</option>
+                                            <option value="2x">Tamanho 2 (Grande)</option>
+                                            <option value="3x">Tamanho 3 (Extra Grande)</option>
+                                            <option value="4x">Tamanho 4 (Gigante)</option>
+                                            <option value="5x">Tamanho 5 (Colossal)</option>
+                                        </select>
+                                    </div>
+                                    <button id="manager-save-ticket-btn" class="mt-4 bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700">Salvar Informações do Ticket</button>
                                 </div>
-                                <div class="flex items-center gap-4">
-                                    <input type="checkbox" id="manager-print-unit-price" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                    <label for="manager-print-unit-price" class="block font-semibold">Exibir valor unitário do salgado no ticket</label>
-                                </div>
-                                <button id="manager-save-ticket-btn" class="mt-4 bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700">Salvar Informações do Ticket</button>
-                            </div>
-                            <div class="mt-8 lg:mt-0 p-4 bg-gray-50 rounded-xl shadow-inner lg:w-1/2">
-                                <h3 class="text-lg font-semibold mb-3">Pré-visualização do Ticket</h3>
-                                <div id="ticket-preview-container">
+                                <div class="mt-8 lg:mt-0 p-4 bg-gray-50 rounded-xl shadow-inner lg-w-1/2">
+                                    <h3 class="text-lg font-semibold mb-3">Pré-visualização do Ticket</h3>
+                                    <div id="ticket-preview-container">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -594,7 +614,7 @@
                                     <label for="manager-change-pass-confirm" class="block font-semibold mb-1">Confirmar Nova Senha</label>
                                     <input type="password" id="manager-change-pass-confirm" placeholder="Confirme a nova senha" class="w-full px-4 py-2 border rounded-lg">
                                 </div>
-                                <button id="manager-save-new-pass-btn" class="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 font-semibold">Alterar Senha da Gerência</button>
+                                <button id="manager-save-new-pass-system-btn" class="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 font-semibold">Alterar Senha da Gerência</button>
                             </div>
                         </div>
                         <div class="bg-white p-6 rounded-xl shadow-lg">
@@ -813,7 +833,27 @@
         </div>
     </div>
     
-    <div id="reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50"><div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4"><div id="reminder-content-to-print" class="flex-1 overflow-y-auto printable-area"><h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Lembrete de Produção</h2><p class="text-gray-600 mb-6">Pedidos com retirada para hoje (<span id="reminder-date"></span>)</p><div class="bg-sky-50 p-4 rounded-lg mb-6"><h3 class="text-xl font-semibold mb-3 text-sky-800">Total de Itens para Produzir</h3><div id="reminder-summary-items" class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-gray-700"></div></div><div><h3 class="text-xl font-semibold mb-3 text-gray-700">Lista de Pedidos</h3><div id="reminder-orders-list" class="space-y-4"></div></div></div><div class="mt-6 flex flex-col sm:flex-row justify-end gap-4 no-print"><button id="reminder-print-btn" class="bg-blue-600 text-white px-8 py-2 rounded-lg hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button><button id="reminder-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button></div></div></div>
+    <div id="reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
+            <div id="reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
+                <div id="reminder-weekday-highlight" class="text-center text-4xl font-bold text-blue-600 mb-4 uppercase tracking-wider"></div> 
+                <h2 id="reminder-title" class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Lembrete de Produção (HOJE)</h2>
+                <p class="text-gray-600 mb-6">Pedidos com retirada para hoje (<span id="reminder-date"></span>)</p>
+                <div class="bg-sky-50 p-4 rounded-lg mb-6">
+                    <h3 class="text-xl font-semibold mb-3 text-sky-800">Total de Itens para Produzir</h3>
+                    <div id="reminder-summary-items" class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-gray-700"></div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">Lista de Pedidos</h3>
+                    <div id="reminder-orders-list" class="space-y-4"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-col sm:flex-row justify-end gap-4 no-print">
+                <button id="reminder-print-btn" class="bg-blue-600 text-white px-8 py-2 rounded-lg hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button>
+                <button id="reminder-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
+            </div>
+        </div>
+    </div>
     <div id="whatsapp-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[101]"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-xl font-bold mb-4">Enviar Mensagem para <span id="whatsapp-client-name" class="text-blue-600"></span></h2><textarea id="whatsapp-message-input" class="w-full p-2 border rounded-lg mb-4" rows="5" placeholder="Digite sua mensagem aqui..."></textarea><div class="flex justify-end gap-4"><button id="whatsapp-modal-cancel" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="whatsapp-modal-send" class="bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600">Enviar</button></div></div></div>
     <div id="ticket-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-40"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-2xl font-bold mb-4 text-center no-print">Opções de Comprovante</h2><div class="bg-gray-50 p-4 rounded-lg border max-h-96 overflow-y-auto printable-area"><pre id="ticket-content" class="whitespace-pre-wrap text-sm" style="font-family: 'Courier New', Courier, monospace;"></pre></div><div class="mt-6 grid grid-cols-2 gap-4 no-print"><button id="ticket-print-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button><button id="ticket-whatsapp-btn" class="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600"><i class="fab fa-whatsapp mr-2"></i>WhatsApp</button></div><button id="close-ticket-modal-btn" class="w-full mt-4 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 no-print">Fechar</button></div></div>
     <div id="manager-order-detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 h-5/6 flex flex-col"><h2 class="text-2xl font-bold mb-4 text-center">Detalhes do Pedido <span id="detail-order-number"></span></h2><div id="detail-order-content" class="flex-1 overflow-y-auto space-y-4"></div><div class="mt-6 flex justify-end gap-4"><button id="detail-reactivate-btn" class="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 hidden">Reativar Pedido</button><button id="detail-release-edit-btn" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 hidden">Liberar Edição (Gerência)</button><button id="detail-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button></div></div></div>
@@ -879,7 +919,7 @@
                     </div>
                 </div>
 
-                <div id="employee-content-main-producao" class="hidden flex-1 pt-4 overflow-y-auto">
+                <div id="employee-content-main-producao" class="hidden flex-1 pt-4 overflow-y-auto space-y-6">
                     <div class="bg-amber-100 border-l-4 border-amber-500 text-amber-800 p-4 rounded-lg">
                         <h3 class="font-bold text-lg">Resumo de Produção para Hoje (<span id="daily-summary-date"></span>)</h3>
                         <p class="text-sm">Esta é a lista de todos os itens que precisam ser produzidos para atender aos pedidos com retirada na data de hoje.</p>
@@ -887,12 +927,46 @@
                         </div>
                         <div class="mt-4 text-lg font-bold text-amber-900">Total de Salgados: <span id="total-salgados-producao">0</span></div>
                     </div>
+                    <div class="bg-gray-50 p-4 rounded-lg shadow-inner border">
+                        <h3 class="font-semibold text-gray-700 mb-3">Relatórios Adicionais</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <button id="show-today-reminder-btn" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 font-semibold">
+                                <i class="fas fa-calendar-check mr-2"></i>Lembrete de Produção (Hoje)
+                            </button>
+                            <button id="show-tomorrow-reminder-btn" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 font-semibold">
+                                <i class="fas fa-calendar-day mr-2"></i>Lembrete de Produção (Amanhã)
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
             </div>
             <div class="mt-4 flex flex-col sm:flex-row justify-end items-center no-print flex-shrink-0 gap-4">
                 <button id="employee-report-print-btn" class="w-full sm:w-auto bg-yellow-400 text-gray-800 px-6 py-2 rounded-lg hover:bg-yellow-500"><i class="fa fa-print mr-2"></i>Imprimir</button>
                 <button id="employee-report-close-btn" class="w-full sm:w-auto bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO MODAL PARA LEMBRETE DE AMANHÃ -->
+    <div id="tomorrow-reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
+            <div id="tomorrow-reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
+                <div id="tomorrow-reminder-weekday-highlight" class="text-center text-4xl font-bold text-purple-600 mb-4 uppercase tracking-wider"></div>
+                <h2 id="tomorrow-reminder-title" class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Lembrete de Produção (Amanhã)</h2>
+                <p class="text-gray-600 mb-6">Pedidos com retirada para amanhã (<span id="tomorrow-reminder-date"></span>)</p>
+                <div class="bg-purple-50 p-4 rounded-lg mb-6">
+                    <h3 class="text-xl font-semibold mb-3 text-purple-800">Total de Itens para Produzir</h3>
+                    <div id="tomorrow-reminder-summary-items" class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-gray-700"></div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">Lista de Pedidos</h3>
+                    <div id="tomorrow-reminder-orders-list" class="space-y-4"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-col sm:flex-row justify-end gap-4 no-print">
+                <button id="tomorrow-reminder-print-btn" class="bg-purple-600 text-white px-8 py-2 rounded-lg hover:bg-purple-700"><i class="fa fa-print mr-2"></i>Imprimir</button>
+                <button id="tomorrow-reminder-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
             </div>
         </div>
     </div>
@@ -1007,6 +1081,7 @@
     <script type="module" src="app.js"></script>
     <script type="module" src="pdv.js"></script>
     <script type="module" src="manager.js"></script>
+    <script type="module" src="offlineManager.js"></script>
     <script type="module" src="manager-realtime.js"></script>
     <script type="module" src="charts.js"></script>
     <script type="module" src="employeeManagement.js"></script>

@@ -1,5 +1,8 @@
 // app.js - Ponto de entrada principal da aplicação
 
+// NOVO: Importa o gerenciador de estado offline.
+import { initOfflineManager, cacheEssentialData } from './offlineManager.js';
+
 // Importações do Firebase SDK
 // CORREÇÃO: Remove a inicialização direta e importa de um módulo centralizado para quebrar a dependência circular.
 import { db, auth } from './firebase-config.js';
@@ -11,10 +14,10 @@ import { dom } from './domRefs.js';
 
 // Importa funções utilitárias (agora um módulo separado)
 // Garante que todas as funções auxiliares necessárias sejam importadas.
-import { showToast, showCustomConfirm, formatCurrency, parseCurrency, getTodayDateString, formatDateToBR, formatDateTimeToBR, formatNameToTitleCase, formatPhone, formatTime, roundSinal, getProductInfoById, generateTicketText, generatePrintableReminderText, printTicket, sendWhatsAppMessage, updateWeekdayDisplay, printReminderList, centerText, rightAlignText, leftAlignText, twoColumns, playSound } from './utils.js';
+import { showToast, showCustomConfirm, formatCurrency, parseCurrency, getTodayDateString, formatDateToBR, formatDateTimeToBR, formatNameToTitleCase, formatPhone, formatTime, roundSinal, getProductInfoById, generateTicketText, generatePrintableReminderText, printTicket, sendWhatsAppMessage, updateWeekdayDisplay, printReminderList, centerText, rightAlignText, leftAlignText, twoColumns, playSound, showTomorrowReminderModal } from './utils.js';
 
 // Importa funções do serviço Firebase (agora um módulo separado)
-import { fetchEmployees, logUserActivity, createNotification, fetchAllProductsWithStock, checkForDailyDeliveries, fetchExpiredPendingOrders, findOrderByDocId, updateOrderAlertStatus } from './firebaseService.js';
+import { fetchEmployees, logUserActivity, createNotification, fetchAllProductsWithStock, checkForDailyDeliveries, fetchExpiredPendingOrders, findOrderByDocId, updateOrderAlertStatus, checkForTomorrowDeliveries } from './firebaseService.js';
 
 // Importa funções de autenticação (agora um módulo separado)
 /* import { setupAuthListeners } from './auth.js'; */
@@ -25,9 +28,6 @@ import { setupPdvEventListeners, startNewOrder, renderProducts, showReminderModa
 // Importa funções do Gerente (agora um módulo separado)
 // IMPORTANTE: Adicionado openInteractiveTimeSelector aqui para resolver o ReferenceError
 import { setupManagerDashboardListeners, navigateToManagerView, applyRolePermissions, openInteractiveTimeSelector, triggerNotificationAnimation, createExpiredOrderAlertHTML } from './manager.js';
-
-// Importa o novo módulo de tempo real para o painel do gerente
-import { setupRealtimeOrderListener } from './manager-realtime.js';
 
 // Importa funções de gerenciamento de funcionários (agora um módulo separado)
 import { populatePdvEmployeeSwitcher, populateLoginEmployeeSelect, addEmployee, editEmployee, deleteEmployee, loadEmployees, saveProductionSettings } from './employeeManagement.js';
@@ -851,51 +851,49 @@ export function stopNotificationListener() {
     }
 }
 
+/**
+ * NOVO: Centraliza a lógica de exibição das telas principais (Login, PDV, Gerente).
+ * Garante que apenas uma tela esteja visível por vez.
+ * @param {'auth' | 'pdv' | 'manager'} viewName O nome da tela a ser exibida.
+ */
+function showView(viewName) {
+    const views = {
+        auth: dom.authScreen,
+        pdv: dom.mainContent,
+        manager: dom.managerDashboard
+    };
+
+    // Esconde todas as telas principais
+    Object.values(views).forEach(view => {
+        if (view) view.style.display = 'none';
+    });
+
+    // Mostra a tela solicitada
+    const viewToShow = views[viewName];
+    if (viewToShow) {
+        // 'flex' é usado para os layouts do PDV e Gerente, 'block' para o login
+        const displayStyle = (viewName === 'pdv' || viewName === 'manager') ? 'flex' : 'block';
+        viewToShow.style.display = displayStyle;
+    } else {
+        console.error(`showView: A tela '${viewName}' não foi encontrada.`);
+    }
+}
+
 // Função para iniciar a aplicação com base no tipo de usuário
 export async function startApp(userType, user) {
     console.log("startApp: Iniciando aplicação para tipo de usuário:", userType, "com dados:", user);
-    
-    // Log do estado atual dos elementos antes de qualquer mudança
-    console.log("startApp: Estado inicial - dom.authScreen:", dom.authScreen ? 'presente' : 'ausente', 'display:', dom.authScreen?.style.display);
-    console.log("startApp: Estado inicial - dom.mainContent:", dom.mainContent ? 'presente' : 'ausente', 'display:', dom.mainContent?.style.display);
-    console.log("startApp: Estado inicial - dom.managerDashboard:", dom.managerDashboard ? 'presente' : 'ausente', 'display:', dom.managerDashboard?.style.display);
-
-    if (dom.authScreen) {
-        // Força a ocultação e garante que fique atrás de tudo
-        dom.authScreen.style.display = 'none'; 
-        dom.authScreen.style.zIndex = '-1'; 
-        console.log("startApp: dom.authScreen forçado para display: none e zIndex: -1.");
-    } else {
-        console.error("startApp: dom.authScreen não encontrado!");
-    }
-    
-    await loadConfig(); // Garante que as configurações sejam carregadas antes de renderizar produtos
     
     currentUser = { id: user.id, name: user.name, role: user.role || userType, uid: user.uid };
     console.log("startApp: Usuário atual definido como:", currentUser);
 
     // Se o login foi feito como 'funcionario', o usuário vai para o PDV.
     if (userType === 'funcionario') {
-        console.log("startApp: Modo funcionário. Tentando exibir PDV.");
-        if (dom.mainContent) { 
-            // Força a exibição e garante que esteja na frente
-            dom.mainContent.style.display = 'flex'; 
-            dom.mainContent.style.zIndex = '1'; 
-            console.log("startApp: dom.mainContent.style.display definido para 'flex' e zIndex: '1'.");
-        } else {
-            console.error("startApp: dom.mainContent não encontrado!");
-        }
-        if (dom.managerDashboard) { 
-            dom.managerDashboard.style.display = 'none'; 
-            console.log("startApp: dom.managerDashboard.style.display definido para 'none'.");
-        } else {
-            console.warn("startApp: dom.managerDashboard não encontrado (pode ser normal se não estiver no HTML).");
-        }
+        showView('pdv');
 
         renderProducts(); // Renderiza produtos após carregar as configurações
 
         // A chamada a startNewOrder() já obtém o próximo número e configura o pdvCurrentOrder
-        await startNewOrder(); 
+        await startNewOrder();
         
         setupPdvEventListeners(); // Configura listeners do PDV
         setupEmployeeReportListeners(); // Configura listeners do Relatório do Funcionário
@@ -922,11 +920,39 @@ export async function startApp(userType, user) {
         if (dom.pdvEmployeeOnlineStatus) dom.pdvEmployeeOnlineStatus.classList.remove('hidden');
 
         // CORREÇÃO: Ordem dos pop-ups
-        // 1. Verifica lembretes de produção PRIMEIRO
-        const dailyDeliveries = await checkForDailyDeliveries();
-        if (dailyDeliveries && dailyDeliveries.length > 0) {
-            currentReminderOrders = dailyDeliveries; // Atualiza a variável global
-            showReminderModal(dailyDeliveries); // Chama o modal de lembrete do PDV
+        // 1. Verifica lembretes de produção com base no horário.
+        const currentHour = new Date().getHours();
+        console.log(`[Lembrete] Hora atual detectada: ${currentHour}`);
+
+        // Lembrete de HOJE: das 7h às 16:59h
+        if (currentHour >= 7 && currentHour < 17) {
+            console.log("[Lembrete] Verificando lembrete de HOJE.");
+            const dailyDeliveries = await checkForDailyDeliveries();
+            if (dailyDeliveries && dailyDeliveries.length > 0) {
+                currentReminderOrders = dailyDeliveries; // Atualiza a variável global
+                showReminderModal(dailyDeliveries); // Chama o modal de lembrete do PDV
+            } else {
+                console.log("[Lembrete] Nenhum pedido para hoje encontrado.");
+            }
+        } 
+        // Lembrete de AMANHÃ: das 17h às 19h
+        else if (currentHour >= 17 && currentHour <= 19) {
+            console.log("[Lembrete] Verificando lembrete de AMANHÃ.");
+            const todayDateString = getTodayDateString('dd/mm/yyyy');
+            const lastReminderDate = localStorage.getItem('lastTomorrowReminderDate');
+            const isReminderShownToday = lastReminderDate === todayDateString;
+            console.log(`[Lembrete] Lembrete de amanhã já foi exibido hoje? ${isReminderShownToday}`);
+
+            if (!isReminderShownToday) {
+                const tomorrowDeliveries = await checkForTomorrowDeliveries();
+                if (tomorrowDeliveries && tomorrowDeliveries.length > 0) {
+                    console.log(`[Lembrete] ${tomorrowDeliveries.length} pedido(s) para amanhã encontrado(s). Exibindo modal.`);
+                    showTomorrowReminderModal(tomorrowDeliveries);
+                    localStorage.setItem('lastTomorrowReminderDate', todayDateString);
+                } else {
+                    console.log("[Lembrete] Nenhum pedido para amanhã encontrado.");
+                }
+            }
         }
         
         // 2. Verifica a Central de Alertas DEPOIS
@@ -962,22 +988,7 @@ export async function startApp(userType, user) {
     }
     // Se o login foi feito como 'gerente' ou 'mestra', o usuário vai para o painel gerencial.
     else {
-        console.log("startApp: Modo gerente/mestra. Tentando exibir Painel Gerencial.");
-        if (dom.manager && dom.manager.nameDisplay) { dom.manager.nameDisplay.textContent = user.name; }
-        if (dom.managerDashboard) { 
-            // Força a exibição e garante que esteja na frente
-            dom.managerDashboard.style.display = 'flex'; 
-            dom.managerDashboard.style.zIndex = '1'; 
-            console.log("startApp: dom.managerDashboard.style.display definido para 'flex' e zIndex: '1'.");
-        } else {
-            console.error("startApp: dom.managerDashboard não encontrado!");
-        }
-        if (dom.mainContent) { 
-            dom.mainContent.style.display = 'none'; 
-            console.log("startApp: dom.mainContent.style.display definido para 'none'.");
-        } else {
-            console.warn("startApp: dom.mainContent não encontrado (pode ser normal se não estiver no HTML).");
-        }
+        showView('manager');
         
         setupManagerDashboardListeners(); // Configura listeners do Gerente
         setupEmployeeReportListeners(); // Configura listeners do Relatório do Funcionário (para acesso via gerente)
@@ -1019,8 +1030,7 @@ export async function startApp(userType, user) {
         }
         startNotificationListener(); // Inicia o listener para o gerente
 
-        // NOVO: Inicia o listener de pedidos em tempo real para a tabela de pedidos
-        setupRealtimeOrderListener();
+        if (dom.manager && dom.manager.nameDisplay) { dom.manager.nameDisplay.textContent = user.name; }
     }
     console.log("startApp: Aplicação iniciada.");
 }
@@ -1387,10 +1397,19 @@ async function handleAlertAction(e) {
 }
 
 // Função principal de inicialização
-function main() {
+async function main() {
     console.log("main: Iniciando a aplicação...");
     try { // CORREÇÃO: A inicialização do Firebase foi movida para 'firebase-config.js' para evitar dependência circular.
         console.log("main: Firebase inicializado a partir do módulo de configuração.");
+
+        // NOVO: Inicializa o gerenciador de estado online/offline.
+        // Isso adiciona os listeners que mostram/escondem o indicador "Offline".
+        initOfflineManager();
+
+        // Garante que as configurações e produtos sejam carregados antes de qualquer outra coisa.
+        await loadConfig();
+        // Faz o cache dos dados essenciais (produtos, etc.) para uso offline.
+        await cacheEssentialData();
 
         // Configura os listeners de autenticação
         setupAuthListeners();
@@ -1398,14 +1417,14 @@ function main() {
         // NOVO: Configura os listeners para os filtros do Log de Atividades
         setupActivityLogListeners();
 
-        // NOVO: Configura listeners para o modal de alteração de senha
+        // NOVO: Configura os listeners para o modal de alteração de senha
         setupPasswordChangeListeners();
 
         // NOVO: Configura os listeners do seletor de horário
         setupTimeSelectorListeners();
 
         // Carrega os funcionários e popula o dropdown no início
-        fetchEmployees().then(fetchedEmployees => {
+        await fetchEmployees().then(fetchedEmployees => {
             employees = fetchedEmployees; // Atualiza a variável global employees
             populateLoginEmployeeSelect(); // Popula o seletor de nomes na tela de login
             // Torna a página visível agora que os dados essenciais foram carregados
@@ -1561,22 +1580,9 @@ function main() {
             console.warn("Elementos do menu lateral do gerente não foram encontrados. A funcionalidade de toggle não funcionará.");
         }
 
-        // NOVO: Listener para inicializar views específicas do painel gerencial.
-        // Isso complementa a navegação principal que está em manager.js, garantindo
-        // que as funções de inicialização de dados sejam chamadas no momento certo.
-        if (sidebar) {
-            sidebar.addEventListener('click', (e) => {
-                const link = e.target.closest('.sidebar-link');
-                if (link && link.dataset.view) {
-                    const view = link.dataset.view;
-                    if (view === 'log-atividades') {
-                        initActivityLogView(db); // Passa a variável 'db'
-                    } else if (view === 'clientes') {
-                        renderClientsTable(); // Chama a função para renderizar a tabela de clientes
-                    }
-                }
-            });
-        }
+        // AÇÃO CORRETIVA: Removi um listener de clique duplicado que estava no menu lateral.
+        // A lógica de navegação principal já é tratada em `manager.js`, e ter dois listeners
+        // para o mesmo evento estava causando conflitos e o erro reportado.
 
         // NOVO: Listener para o botão "Ir para PDV" no painel do gerente
         const goToPdvBtn = document.getElementById('go-to-pdv-btn');
@@ -1679,6 +1685,41 @@ function main() {
             });
         }
 
+        // NOVO: Listeners para os botões de lembrete manual na tela de relatório
+        const showTodayReminderBtn = document.getElementById('show-today-reminder-btn');
+        if (showTodayReminderBtn) {
+            showTodayReminderBtn.addEventListener('click', async () => {
+                try {
+                    const dailyDeliveries = await checkForDailyDeliveries();
+                    if (dailyDeliveries && dailyDeliveries.length > 0) {
+                        showReminderModal(dailyDeliveries);
+                    } else {
+                        showToast("Nenhum pedido com retirada para hoje.", "info");
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar lembrete de hoje manualmente:", error);
+                    showToast("Erro ao buscar lembrete de hoje.", "error");
+                }
+            });
+        }
+
+        const showTomorrowReminderBtn = document.getElementById('show-tomorrow-reminder-btn');
+        if (showTomorrowReminderBtn) {
+            showTomorrowReminderBtn.addEventListener('click', async () => {
+                try {
+                    const tomorrowDeliveries = await checkForTomorrowDeliveries();
+                    if (tomorrowDeliveries && tomorrowDeliveries.length > 0) {
+                        showTomorrowReminderModal(tomorrowDeliveries);
+                    } else {
+                        showToast("Nenhum pedido com retirada para amanhã.", "info");
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar lembrete de amanhã manualmente:", error);
+                    showToast("Erro ao buscar lembrete de amanhã.", "error");
+                }
+            });
+        }
+
         // NOVO: Listener para o botão "Voltar ao Painel" no PDV
         const returnToManagerBtn = document.getElementById('return-to-manager-btn');
         if (returnToManagerBtn) {
@@ -1699,7 +1740,20 @@ function main() {
         }
 
     } catch (e) {
-        document.body.innerHTML = `<div class="p-8 bg-red-100 text-red-800"><h1>Erro Crítico</h1><p>Ocorreu um erro que impediu o carregamento do sistema.</p><pre class="mt-4 p-4 bg-red-200 rounded">${e.stack}</pre></div>`;
+        // REFATORAÇÃO: Exibe uma tela de erro mais amigável e profissional em caso de falha crítica na inicialização.
+        document.body.innerHTML = `
+            <div class="flex items-center justify-center min-h-screen bg-gray-100 font-sans">
+                <div class="text-center p-8 bg-white rounded-lg shadow-2xl max-w-md mx-4">
+                    <i class="fas fa-times-circle text-5xl text-red-500 mb-4"></i>
+                    <h1 class="text-2xl font-bold text-gray-800 mb-2">Erro Crítico</h1>
+                    <p class="text-gray-600 mb-6">Ocorreu um erro inesperado que impediu o carregamento do sistema. Por favor, tente recarregar a página.</p>
+                    <button onclick="window.location.reload()" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+                        Recarregar Aplicação
+                    </button>
+                    <details class="mt-4 text-left text-xs text-gray-500"><summary class="cursor-pointer">Detalhes técnicos</summary><pre class="mt-2 p-2 bg-gray-100 rounded whitespace-pre-wrap break-all">${e.stack}</pre></details>
+                </div>
+            </div>
+        `;
         console.error("ERRO CRÍTICO:", e);
     }
 }
