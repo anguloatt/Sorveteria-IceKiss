@@ -47,8 +47,8 @@ export function renderMainSalesChart(salesData) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        callback: function(value) { return 'R$ ' + value; } // Formata o eixo Y com "R$"
+                    ticks: { // Usa a função de utilidade para consistência na formatação de moeda
+                        callback: formatCurrency
                     }
                 }
             }
@@ -147,79 +147,6 @@ export function createOrUpdateLineChart(canvasId, labels, data, label, pointColo
 }
 
 /**
- * NOVA FUNÇÃO: Minha função genérica para criar ou atualizar gráficos de linha com rótulos personalizados e cores específicas.
- * @param {string} canvasId O ID do elemento canvas.
- * @param {Array<string>} labels Os rótulos do eixo X (podem ser strings formatadas).
- * @param {Array<number>} data Os dados do eixo Y.
- * @param {string} label O rótulo do conjunto de dados.
- * @param {string} borderColor A cor da linha e da borda.
- */
-export function createOrUpdateLineChartWithLabels(canvasId, labels, data, label, borderColor) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) {
-        console.warn(`Elemento canvas '${canvasId}' não encontrado.`);
-        return;
-    }
-    const ctx = canvas.getContext('2d');
-
-    if (charts[canvasId]) {
-        charts[canvasId].destroy();
-    }
-
-    charts[canvasId] = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: label,
-                data: data,
-                backgroundColor: `${borderColor}33`, // Adiciona opacidade para o fundo
-                borderColor: borderColor,
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true,
-                pointRadius: 5,
-                pointBackgroundColor: borderColor,
-                pointBorderColor: '#fff',
-                pointHoverRadius: 7,
-                pointHoverBackgroundColor: borderColor,
-                pointHoverBorderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) { return 'R$ ' + value.toFixed(2); } // Formata o eixo Y com "R$"
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false // Opcional: remover as linhas de grade verticais para um visual mais limpo
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false // Geralmente não é necessário para um único conjunto de dados
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-
-/**
  * Minha função genérica para criar ou atualizar gráficos de barras.
  * @param {string} canvasId O ID do elemento canvas.
  * @param {Array<string>} labels Os rótulos para cada barra.
@@ -265,10 +192,10 @@ export function createOrUpdateBarChart(canvasId, labels, data, label, color, isH
                 [valueAxis]: { // Configura o eixo de valores (x para horizontal, y para vertical)
                     beginAtZero: true,
                     ticks: {
-                        callback: function(value) {
-                            if (isCurrency) {
-                                return 'R$ ' + value.toFixed(2);
-                            }
+                    callback: function(value) { // Usa a função de utilidade para consistência
+                        if (isCurrency) {
+                            return formatCurrency(value);
+                        }
                             return value;
                         }
                     }
@@ -323,8 +250,8 @@ export function renderCategorySalesChart(canvasId, categoryData = []) {
             plugins: {
                 legend: { position: 'top' },
                 tooltip: {
-                    callbacks: {
-                        label: (context) => `${context.label}: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed)}`
+                    callbacks: { // Usa a função de utilidade para consistência na formatação de moeda
+                        label: (context) => `${context.label}: ${formatCurrency(context.parsed)}`
                     }
                 }
             }

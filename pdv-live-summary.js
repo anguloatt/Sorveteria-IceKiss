@@ -2,6 +2,7 @@ import { formatCurrency, getProductInfoById } from './utils.js';
 
 const liveOrderItemsContainer = document.getElementById('live-order-items');
 const liveOrderTotalEl = document.getElementById('live-order-total');
+const liveOrderKibeWarning = document.getElementById('live-order-kibe-warning');
 const liveOrderPlaceholder = document.getElementById('live-order-placeholder');
 
 /**
@@ -32,7 +33,7 @@ function createLiveOrderItemElement(item) {
  * @param {object} order - O objeto do pedido atual que uso para atualizar a tela.
  */
 export function updateLiveSummary(order) {
-    if (!liveOrderItemsContainer || !liveOrderTotalEl || !liveOrderPlaceholder) return;
+    if (!liveOrderItemsContainer || !liveOrderTotalEl || !liveOrderPlaceholder || !liveOrderKibeWarning) return;
 
     liveOrderItemsContainer.innerHTML = '';
     const items = order?.items || [];
@@ -51,6 +52,10 @@ export function updateLiveSummary(order) {
         }
         return acc;
     }, 0);
+
+    // NOVO: Verifica se há "Kibe" no pedido e exibe o aviso.
+    const hasKibe = items.some(item => item.name.toLowerCase().includes('kibe'));
+    liveOrderKibeWarning.classList.toggle('hidden', !hasKibe);
 
     liveOrderTotalEl.textContent = totalSalgados;
 

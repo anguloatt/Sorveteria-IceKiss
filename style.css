@@ -1,30 +1,97 @@
 /* style.css */
 
 /* Importação da fonte Inter do Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 /* Reset básico e estilos gerais */
+/* :root define as variáveis para o tema claro (padrão) */
 :root {
-    --primary-color: #007bff;
-    --secondary-color: #6c757d;
-    --success-color: #28a745;
-    --danger-color: #dc3545;
-    --warning-color: #ffc107;
-    --info-color: #17a2b8;
-    --light-color: #f8f9fa;
-    --dark-color: #343a40;
-    --bg-light: #f4f7f6;
-    --bg-dark: #2c3e50;
-    --text-light: #f8f9fa;
-    --text-dark: #212529;
-    --card-bg: #ffffff;
-    --border-color: #e9ecef;
+    /* Fonts */
+    --font-primary: 'Poppins', sans-serif;
+    --font-mono: 'Courier New', Courier, monospace;
+
+    /* Colors - Brand & Accent */
+    --color-accent: #f59e0b; /* amber-500 */
+    --color-accent-dark: #d97706; /* amber-600 */
+    --color-primary: #3b82f6; /* blue-600 */
+    --color-primary-dark: #2563eb; /* blue-700 */
+    --color-primary-light: #eff6ff; /* blue-50 */
+    --color-primary-lighter: #dbeafe; /* blue-100 */
+
+    /* Colors - Semantic */
+    --color-success: #22c55e; /* green-500 */
+    --color-success-dark: #16a34a; /* green-600 */
+    --color-danger: #ef4444; /* red-500 */
+    --color-danger-dark: #dc2626; /* red-600 */
+    --color-warning: #f97316; /* orange-600 */
+    --color-warning-dark: #ea580c; /* orange-700 */
+    --color-info: #0ea5e9; /* sky-500 */
+    --color-neutral: #64748b; /* slate-500 */
+    --color-neutral-dark: #475569; /* slate-600 */
+    --color-indigo: #6366f1; /* indigo-500 */
+
+    /* Colors - Base */
+    --color-background: #f1f5f9; /* slate-100 */
+    --color-surface: #ffffff; /* white */
+    --color-surface-alt: #f8fafc; /* slate-50 */
+    --color-surface-hover: #f1f5f9; /* slate-100 */
+    --color-border: #e5e7eb; /* gray-200 */
+    --color-border-strong: #cbd5e1; /* slate-300 */
+
+    /* Colors - Text */
+    --color-text-primary: #1f2937; /* gray-800 */
+    --color-text-secondary: #6b7280; /* gray-500 */
+    --color-text-on-accent: #ffffff;
+    --color-text-on-primary: #ffffff;
+    --color-text-on-danger: #ffffff;
+    --color-text-on-success: #ffffff;
+    --color-text-on-warning: #ffffff;
+    --color-text-on-neutral: #ffffff;
+
+    /* Colors - Sidebar */
+    --color-sidebar-background: #1f2937; /* gray-800 */
+    --color-sidebar-text: #f9fafb; /* gray-50 */
+    --color-sidebar-link-hover-bg: #374151; /* gray-700 */
+    --color-sidebar-link-active-bg: #4f46e5; /* indigo-600 */
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-3d-btn: 0 6px 12px rgba(0,0,0,0.25), 0 3px 6px rgba(0,0,0,0.15);
+
+    /* Borders */
+    --border-radius-sm: 0.375rem; /* 6px */
+    --border-radius-md: 0.5rem; /* 8px */
+    --border-radius-lg: 0.75rem; /* 12px */
+    --border-radius-full: 9999px;
+
+    /* Layout */
     --sidebar-width: 250px;
     --header-height: 60px;
-    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-body { font-family: 'Poppins', sans-serif; } /* Define a fonte padrão para o corpo */
+/* Tema Escuro (Dark Mode) */
+[data-theme="dark"] {
+    /* Colors - Base */
+    --color-background: #111827; /* gray-900 */
+    --color-surface: #1f2937; /* gray-800 */
+    --color-surface-alt: #374151; /* gray-700 */
+    --color-surface-hover: #4b5563; /* gray-600 */
+    --color-border: #4b5563; /* gray-600 */
+    --color-border-strong: #6b7280; /* gray-500 */
+
+    /* Colors - Text */
+    --color-text-primary: #f9fafb; /* gray-50 */
+    --color-text-secondary: #d1d5db; /* gray-300 */
+    --color-text-on-accent: #1f2937; /* text on amber */
+
+    /* Colors - Sidebar */
+    --color-sidebar-background: #111827; /* gray-900 */
+    --color-sidebar-link-hover-bg: #374151; /* gray-700 */
+}
+
+body { font-family: var(--font-primary); background-color: var(--color-background); color: var(--color-text-primary); } /* Define a fonte padrão para o corpo */
 
 /* Previne o FOUC (Flash of Unstyled Content) escondendo o corpo até que o JS o torne visível */
 body.invisible { visibility: hidden; }
@@ -38,55 +105,55 @@ body.invisible { visibility: hidden; }
 }
 
 ::-webkit-scrollbar { width: 8px; } /* Largura da barra de rolagem */
-::-webkit-scrollbar-track { background: #f1f1f1; } /* Cor do trilho da barra de rolagem */
-::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; } /* Cor e arredondamento do "polegar" da barra de rolagem */
-::-webkit-scrollbar-thumb:hover { background: #555; } /* Cor do "polegar" no hover */
-.status-label { padding: 4px 12px; border-radius: 9999px; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: white; } /* Estilo base para rótulos de status */
-.status-novo { background-color: #3b82f6; } /* Cor de fundo para status "novo" */
-.status-ativo { background-color: #22c55e; } /* Cor de fundo para status "ativo" */
-.status-alterado { background-color: #f97316; } /* Cor de fundo para status "alterado" */
-.status-cancelado { background-color: #ef4444; } /* Cor de fundo para status "cancelado" */
-.input-status-novo { border-color: #3b82f6; } /* Cor da borda para input com status "novo" */
-.input-status-ativo { border-color: #22c55e; } /* Cor da borda para input com status "ativo" */
-.input-status-alterado { border-color: #f97316; } /* Cor da borda para input com status "alterado" */
-.input-status-cancelado { border-color: #ef4444; } /* Cor da borda para input com status "cancelado" */
+::-webkit-scrollbar-track { background: var(--color-surface-hover); } /* Cor do trilho da barra de rolagem */
+::-webkit-scrollbar-thumb { background: var(--color-text-secondary); border-radius: var(--border-radius-sm); } /* Cor e arredondamento do "polegar" da barra de rolagem */
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-primary); } /* Cor do "polegar" no hover */
+.status-label { padding: 4px 12px; border-radius: var(--border-radius-full); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: var(--color-text-on-primary); } /* Estilo base para rótulos de status */
+.status-novo { background-color: var(--color-primary); } /* Cor de fundo para status "novo" */
+.status-ativo { background-color: var(--color-success); } /* Cor de fundo para status "ativo" */
+.status-alterado { background-color: var(--color-warning); } /* Cor de fundo para status "alterado" */
+.status-cancelado { background-color: var(--color-danger); } /* Cor de fundo para status "cancelado" */
+.input-status-novo { border-color: var(--color-primary); } /* Cor da borda para input com status "novo" */
+.input-status-ativo { border-color: var(--color-success); } /* Cor da borda para input com status "ativo" */
+.input-status-alterado { border-color: var(--color-warning); } /* Cor da borda para input com status "alterado" */
+.input-status-cancelado { border-color: var(--color-danger); } /* Cor da borda para input com status "cancelado" */
 .payment-status { 
     font-size: 1.25rem; /* Tamanho da fonte para status de pagamento */
     font-weight: 700; /* Peso da fonte */
     display: inline-block; /* Permite que a largura se ajuste ao conteúdo */
     padding: 4px 8px; /* Espaçamento interno */
-    border-radius: 8px; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
 }
-.payment-pago { background-color: #16a34a; color: white; } /* Estilo para status "pago" */
-.payment-devedor { background-color: #f97316; color: white; } /* Estilo para status "devedor" */
+.payment-pago { background-color: var(--color-success-dark); color: var(--color-text-on-success); } /* Estilo para status "pago" */
+.payment-devedor { background-color: var(--color-warning); color: var(--color-text-on-warning); } /* Estilo para status "devedor" */
 .modal { display: none; } .modal.active { display: flex; } /* Estilos para modais (oculto por padrão, visível quando ativo) */
-.toast { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: bottom 0.5s ease-in-out; z-index: 1000; } /* Estilo base para toasts */
+.toast { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: var(--border-radius-md); color: var(--color-text-on-primary); font-weight: 500; box-shadow: var(--shadow-lg); transition: bottom 0.5s ease-in-out; z-index: 1000; } /* Estilo base para toasts */
 .toast.show { bottom: 20px; } /* Posição do toast quando visível */
-.toast.success { background-color: #22c55e; } /* Cor de fundo para toast de sucesso */
-.toast.error { background-color: #ef4444; } /* Cor de fundo para toast de erro */
-.toast.info { background-color: #3b82f6; } /* Cor de fundo para toast de informação */
-.title-shadow { text-shadow: 1px 1px 3px rgba(0,0,0,0.1); } /* Sombra de texto para títulos */
+.toast.success { background-color: var(--color-success); } /* Cor de fundo para toast de sucesso */
+.toast.error { background-color: var(--color-danger); } /* Cor de fundo para toast de erro */
+.toast.info { background-color: var(--color-primary); } /* Cor de fundo para toast de informação */
+.title-shadow { text-shadow: var(--shadow-sm); } /* Sombra de texto para títulos */
 /* Ajustes para as abas de login */
 .login-tab {
     white-space: nowrap; /* Evita quebra de linha */
     padding: 0.75rem 1.5rem; /* Espaçamento interno */
     font-weight: 600; /* Peso da fonte */
     font-size: 1.125rem; /* Tamanho da fonte */
-    color: #6b7280; /* Cor do texto */
+    color: var(--color-text-secondary); /* Cor do texto */
     border-bottom: 2px solid transparent; /* Borda inferior transparente */
     transition: all 0.2s ease-in-out; /* Transição suave para todas as propriedades */
-    border-radius: 0.5rem 0.5rem 0 0; /* Arredonda apenas o topo */
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0; /* Arredonda apenas o topo */
     position: relative; /* Posição relativa para z-index */
     z-index: 10; /* Garante que as abas fiquem por cima do conteúdo */
 }
 .login-tab:hover {
-    color: #4b5563; /* Cor do texto no hover */
+    color: var(--color-text-primary); /* Cor do texto no hover */
 }
 .login-tab.active-tab-login {
-    color: #f59e0b !important; /* Cor do texto quando ativo */
-    background-color: white !important; /* Fundo branco quando ativo */
-    border-color: #f59e0b !important; /* Cor da borda quando ativo */
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.1); /* Sombra para destacar */
+    color: var(--color-accent) !important; /* Cor do texto quando ativo */
+    background-color: var(--color-surface) !important; /* Fundo branco quando ativo */
+    border-color: var(--color-accent) !important; /* Cor da borda quando ativo */
+    box-shadow: var(--shadow-md); /* Sombra para destacar */
 }
 
 /* Estilo para o select de funcionário no login para ter a seta */
@@ -100,8 +167,8 @@ select.appearance-none {
 
 .sidebar-link { transition: all 0.2s ease-in-out; } /* Transição para links da sidebar */
 .sidebar-link:hover, .sidebar-link.active {
-    background-color: #f59e0b; /* Cor de fundo no hover/ativo */
-    color: white; /* Cor do texto no hover/ativo */
+    background-color: var(--color-accent); /* Cor de fundo no hover/ativo */
+    color: var(--color-text-on-accent); /* Cor do texto no hover/ativo */
     transform: translateX(4px); /* Efeito de deslize no hover/ativo */
 }
 html, body { height: 100%; overflow: hidden; } /* Garante que o html e body ocupem 100% da altura e esconde overflow */
@@ -132,7 +199,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
         width: 100%;
         padding: 0 !important;
         margin: 0 !important;
-        font-family: 'Courier New', Courier, monospace !important; /* Força a fonte monoespaçada, ideal para cupons */
+        font-family: var(--font-mono) !important; /* Força a fonte monoespaçada, ideal para cupons */
         font-size: 14px !important; /* Aumenta o tamanho da fonte */
         line-height: 1.2 !important; /* Espaçamento entre linhas */
     }
@@ -180,8 +247,8 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 /* Sidebar oculta por padrão em mobile, aparece com 'open' */
 #manager-sidebar {
     width: 256px;
-    background-color: #1f2937; /* bg-gray-800 */
-    color: white;
+    background-color: var(--color-sidebar-background); /* bg-gray-800 */
+    color: var(--color-sidebar-text);
     flex-direction: column;
     position: fixed; /* Sempre fixo para deslizar sobre o conteúdo */
     top: 0;
@@ -236,7 +303,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 /* Ajuste para o status do pedido no cabeçalho - movido para ficar junto com os botões de navegação */
 #status-pedido-label {
     font-weight: 700; /* Peso da fonte */
-    color: #1f2937; /* Cor preta escura */
+    color: var(--color-text-primary); /* Cor preta escura */
     font-size: 0.875rem; /* Tamanho da fonte */
     margin-left: 0.5rem; /* Margem à esquerda para separar da lupa */
     margin-right: 0.5rem; /* Margem à direita para separar do status-display */
@@ -274,10 +341,10 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 #manager-menu-btn {
     font-size: 2.5rem; /* Aumenta o tamanho do ícone */
     padding: 0.5rem; /* Aumenta a área clicável */
-    border-radius: 9999px; /* Torna-o redondo */
-    background-color: #f59e0b; /* Cor de fundo para destaque */
-    color: white; /* Cor do ícone */
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Sombra para destaque */
+    border-radius: var(--border-radius-full); /* Torna-o redondo */
+    background-color: var(--color-accent); /* Cor de fundo para destaque */
+    color: var(--color-text-on-accent); /* Cor do ícone */
+    box-shadow: var(--shadow-md); /* Sombra para destaque */
     transition: all 0.2s ease-in-out; /* Transição suave */
     display: flex; /* Garante que o ícone esteja centralizado */
     align-items: center; /* Alinha verticalmente */
@@ -287,7 +354,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 }
 
 #manager-menu-btn:hover {
-    background-color: #ea580c; /* Cor mais escura ao passar o mouse */
+    background-color: var(--color-warning-dark); /* Cor mais escura ao passar o mouse */
     transform: scale(1.05); /* Pequeno efeito de escala */
 }
 
@@ -371,10 +438,10 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 
 
 .cardapio-column {
-    background-color: #f8fafc; /* Cor de fundo */
-    border-radius: 0.75rem; /* Arredondamento da borda */
+    background-color: var(--color-surface-alt); /* Cor de fundo */
+    border-radius: var(--border-radius-lg); /* Arredondamento da borda */
     padding: 1rem; /* Espaçamento interno */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Sombra */
+    box-shadow: var(--shadow-sm); /* Sombra */
     display: flex; /* Torna-o um contêiner flex */
     flex-direction: column; /* Empilha os filhos verticalmente */
     height: 100%; /* Altura total */
@@ -383,9 +450,9 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 .cardapio-column-header {
     font-size: 1.125rem; /* Tamanho da fonte */
     font-weight: 700; /* Peso da fonte */
-    color: white; /* Cor do texto */
+    color: var(--color-text-on-primary); /* Cor do texto */
     padding: 0.5rem 0.75rem; /* Espaçamento interno */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     margin-bottom: 0.75rem; /* Margem inferior */
     text-align: center; /* Alinhamento do texto */
 }
@@ -398,9 +465,9 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 }
 
 .cardapio-item {
-    background-color: #f1f5f9; /* Cor de fundo */
+    background-color: var(--color-surface-hover); /* Cor de fundo */
     padding: 0.75rem; /* Espaçamento interno */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     display: flex; /* Torna-o um contêiner flex */
     align-items: center; /* Alinha os itens ao centro verticalmente */
     justify-content: space-between; /* Espaça os itens uniformemente */
@@ -408,47 +475,49 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 }
 
 .cardapio-item:hover {
-    background-color: #e2e8f0; /* Cor de fundo no hover */
+    background-color: var(--color-border); /* Cor de fundo no hover */
 }
 
 .cardapio-item-name {
     font-weight: 600; /* Peso da fonte */
     font-size: 1rem; /* Tamanho da fonte */
-    color: #334155; /* Cor do texto */
+    color: var(--color-text-primary); /* Cor do texto */
 }
 
 .cardapio-item-price {
     font-size: 0.875rem; /* Tamanho da fonte */
-    color: #64748b; /* Cor do texto */
+    color: var(--color-text-secondary); /* Cor do texto */
     margin-left: 0.5rem; /* Margem à esquerda */
 }
 
 .product-quantity {
     width: 4rem; /* Largura */
     text-align: center; /* Alinhamento do texto */
-    border: 1px solid #cbd5e1; /* Borda */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border: 1px solid var(--color-border-strong); /* Borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     padding: 0.25rem; /* Espaçamento interno */
     font-size: 1rem; /* Tamanho da fonte */
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
 }
 
 .manual-item-input {
     width: 100%; /* Largura total */
     padding: 0.5rem; /* Espaçamento interno */
-    border: 1px solid #cbd5e1; /* Borda */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border: 1px solid var(--color-border-strong); /* Borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     font-size: 0.875rem; /* Tamanho da fonte */
 }
 .manual-item-btn {
-    background-color: #94a3b8; /* Cor de fundo */
-    color: white; /* Cor do texto */
+    background-color: var(--color-neutral); /* Cor de fundo */
+    color: var(--color-text-on-neutral); /* Cor do texto */
     padding: 0.5rem 0.75rem; /* Espaçamento interno */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     font-weight: 600; /* Peso da fonte */
     transition: background-color 0.2s ease-in-out; /* Transição suave para a cor de fundo */
 }
 .manual-item-btn:hover {
-    background-color: #64748b; /* Cor de fundo no hover */
+    background-color: var(--color-neutral-dark); /* Cor de fundo no hover */
 }
 
 /* Estilos para as abas do cardápio no painel gerencial */
@@ -458,50 +527,50 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     border-bottom-width: 2px; /* Largura da borda inferior */
     font-weight: 500; /* Peso da fonte */
     font-size: 0.875rem; /* Tamanho da fonte */
-    color: #64748b; /* Cor do texto */
+    color: var(--color-text-secondary); /* Cor do texto */
     border-color: transparent; /* Cor da borda transparente */
     transition: all 0.2s ease-in-out; /* Transição suave para todas as propriedades */
 }
 .manager-cardapio-tab:hover {
-    color: #4b5563; /* Cor do texto no hover */
-    border-color: #d1d5db; /* Cor da borda no hover */
+    color: var(--color-text-primary); /* Cor do texto no hover */
+    border-color: var(--color-border); /* Cor da borda no hover */
 }
 .manager-cardapio-tab.active-tab-manager {
-    color: white; /* Cor do texto quando ativo */
-    background-color: #f59e0b; /* Cor de fundo quando ativo */
-    border-color: #f59e0b; /* Cor da borda quando ativo */
+    color: var(--color-text-on-accent); /* Cor do texto quando ativo */
+    background-color: var(--color-accent); /* Cor de fundo quando ativo */
+    border-color: var(--color-accent); /* Cor da borda quando ativo */
     font-weight: 700; /* Peso da fonte */
-    border-radius: 0.5rem 0.5rem 0 0; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0; /* Arredondamento da borda */
 }
 .manager-cardapio-tab-container {
     display: flex; /* Torna-o um contêiner flex */
     overflow-x: auto; /* Rolagem horizontal */
     -webkit-overflow-scrolling: touch; /* Rolagem suave em iOS */
     padding-bottom: 0.5rem; /* Espaçamento inferior */
-    border-bottom: 2px solid #e5e7eb; /* Borda inferior */
-    background-color: white; /* Cor de fundo */
-    border-radius: 0.75rem 0.75rem 0 0; /* Arredondamento da borda */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Sombra */
+    border-bottom: 2px solid var(--color-border); /* Borda inferior */
+    background-color: var(--color-surface); /* Cor de fundo */
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0; /* Arredondamento da borda */
+    box-shadow: var(--shadow-sm); /* Sombra */
 }
 .manager-cardapio-tab-add-btn {
-    background-color: #3b82f6; /* Cor de fundo */
-    color: white; /* Cor do texto */
+    background-color: var(--color-primary); /* Cor de fundo */
+    color: var(--color-text-on-primary); /* Cor do texto */
     padding: 0.5rem 1rem; /* Espaçamento interno */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     font-weight: 600; /* Peso da fonte */
     margin-left: auto; /* Margem automática à esquerda */
     align-self: center; /* Alinha ao centro verticalmente */
     transition: background-color 0.2s ease-in-out; /* Transição suave */
 }
 .manager-cardapio-tab-add-btn:hover {
-    background-color: #2563eb; /* Cor de fundo no hover */
+    background-color: var(--color-primary-dark); /* Cor de fundo no hover */
 }
 
 /* Estilos para os campos de edição de produto no painel gerencial */
 .product-config-row {
-    background-color: #f1f5f9; /* Cor de fundo */
+    background-color: var(--color-surface-hover); /* Cor de fundo */
     padding: 0.75rem; /* Espaçamento interno */
-    border-radius: 0.5rem; /* Arredondamento da borda */
+    border-radius: var(--border-radius-md); /* Arredondamento da borda */
     display: grid; /* Layout de grade */
     grid-template-columns: repeat(1, 1fr); /* Colunas responsivas */
     gap: 0.75rem; /* Espaçamento entre as células da grade */
@@ -517,23 +586,25 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 .product-config-row select {
     width: 100%;
     padding: 0.5rem 0.75rem; /* Espaçamento interno */
-    border: 1px solid #cbd5e1; /* Borda */
-    border-radius: 0.375rem; /* Arredondamento da borda */
+    border: 1px solid var(--color-border-strong); /* Borda */
+    border-radius: var(--border-radius-sm); /* Arredondamento da borda */
     font-size: 0.875rem; /* Tamanho da fonte */
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
 }
 .product-config-row button {
-    border: 1px solid #cbd5e1; /* Borda */
-    border-radius: 0.375rem; /* Arredondamento da borda */
+    border: 1px solid var(--color-border-strong); /* Borda */
+    border-radius: var(--border-radius-sm); /* Arredondamento da borda */
     font-size: 0.875rem; /* Tamanho da fonte */
 }
 .product-config-row .remove-product-btn {
-    color: #ef4444; /* Cor do texto */
+    color: var(--color-danger); /* Cor do texto */
     font-size: 1.25rem; /* Tamanho da fonte */
     text-align: center; /* Alinhamento do texto */
     transition: color 0.2s ease-in-out; /* Transição suave */
 }
 .product-config-row .remove-product-btn:hover {
-    color: #dc2626; /* Cor do texto no hover */
+    color: var(--color-danger-dark); /* Cor do texto no hover */
 }
 .price-inputs {
     display: grid; /* Layout de grade */
@@ -574,13 +645,13 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     align-items: center; /* Alinha os itens ao centro verticalmente */
     justify-content: center; /* Alinha os itens ao centro horizontalmente */
     padding: 1rem; /* Espaçamento interno */
-    border-radius: 9999px; /* Torna os botões completamente arredondados */
+    border-radius: var(--border-radius-full); /* Torna os botões completamente arredondados */
     font-weight: 600; /* Peso da fonte */
     text-align: center; /* Alinhamento do texto */
     transition: all 0.2s ease-in-out; /* Transição suave para todas as propriedades */
     /* Sombra mais pronunciada para efeito 3D */
-    box-shadow: 0 6px 12px rgba(0,0,0,0.25), 0 3px 6px rgba(0,0,0,0.15); 
-    color: white; /* Cor do texto */
+    box-shadow: var(--shadow-3d-btn); 
+    color: var(--color-text-on-primary); /* Cor do texto */
     border-bottom-width: 4px; /* Largura da borda inferior para efeito 3D */
     border-style: solid; /* Estilo da borda */
     position: relative; /* Necessário para o pseudo-elemento de brilho */
@@ -612,20 +683,20 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 
 
 /* Cores dos botões */
-.btn-novo-pdv { background-color: #3b82f6; border-color: #2563eb; } /* Estilo para botão "Novo" */
-.btn-novo-pdv:hover { background-color: #2563eb; transform: translateY(-5px); } /* Estilo no hover */
-.btn-comprovante-pdv { background-color: #facc15; color: #334155; border-color: #eab308; } /* Estilo para botão "Comprovante" */
-.btn-comprovante-pdv:hover { background-color: #eab308; transform: translateY(-5px); } /* Estilo no hover */
-.btn-finalizar-pdv { background-color: #16a34a; border-color: #15803d; } /* Estilo para botão "Finalizar Pedido" */
-.btn-finalizar-pdv:hover { background-color: #15803d; transform: translateY(-5px); } /* Estilo no hover */
-.btn-atualizar-pdv { background-color: #f97316; border-color: #ea580c; } /* Estilo para botão "Atualizar" */
-.btn-atualizar-pdv:hover { background-color: #ea580c; transform: translateY(-5px); } /* Estilo no hover */
-.btn-cancelar-pdv { background-color: #ef4444; border-color: #dc2626; } /* Estilo para botão "Cancelar" */
-.btn-cancelar-pdv:hover { background-color: #dc2626; transform: translateY(-5px); } /* Estilo no hover */
-.btn-liquidar-pdv { background-color: #22c55e; border-color: #16a34a; } /* Estilo para botão "Liquidar Saldo" */
-.btn-liquidar-pdv:hover { background-color: #16a34a; transform: translateY(-5px); } /* Estilo no hover */
-.btn-sair-pdv { background-color: #64748b; border-color: #475569; } /* Estilo para botão "Sair" */
-.btn-sair-pdv:hover { background-color: #475569; transform: translateY(-5px); } /* Estilo no hover */
+.btn-novo-pdv { background-color: var(--color-primary); border-color: var(--color-primary-dark); } /* Estilo para botão "Novo" */
+.btn-novo-pdv:hover { background-color: var(--color-primary-dark); transform: translateY(-5px); } /* Estilo no hover */
+.btn-comprovante-pdv { background-color: var(--color-accent); color: var(--color-text-on-accent); border-color: var(--color-accent-dark); } /* Estilo para botão "Comprovante" */
+.btn-comprovante-pdv:hover { background-color: var(--color-accent-dark); transform: translateY(-5px); } /* Estilo no hover */
+.btn-finalizar-pdv { background-color: var(--color-success); border-color: var(--color-success-dark); } /* Estilo para botão "Finalizar Pedido" */
+.btn-finalizar-pdv:hover { background-color: var(--color-success-dark); transform: translateY(-5px); } /* Estilo no hover */
+.btn-atualizar-pdv { background-color: var(--color-warning); border-color: var(--color-warning-dark); } /* Estilo para botão "Atualizar" */
+.btn-atualizar-pdv:hover { background-color: var(--color-warning-dark); transform: translateY(-5px); } /* Estilo no hover */
+.btn-cancelar-pdv { background-color: var(--color-danger); border-color: var(--color-danger-dark); } /* Estilo para botão "Cancelar" */
+.btn-cancelar-pdv:hover { background-color: var(--color-danger-dark); transform: translateY(-5px); } /* Estilo no hover */
+.btn-liquidar-pdv { background-color: var(--color-success); border-color: var(--color-success-dark); } /* Estilo para botão "Liquidar Saldo" */
+.btn-liquidar-pdv:hover { background-color: var(--color-success-dark); transform: translateY(-5px); } /* Estilo no hover */
+.btn-sair-pdv { background-color: var(--color-neutral); border-color: var(--color-neutral-dark); } /* Estilo para botão "Sair" */
+.btn-sair-pdv:hover { background-color: var(--color-neutral-dark); transform: translateY(-5px); } /* Estilo no hover */
 
 /* Ajuste para o layout principal do PDV para acomodar os botões na lateral */
 @media (min-width: 1024px) { /* Em telas maiores que 1024px */
@@ -639,7 +710,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 /* Estilo para o status do pedido no cabeçalho */
 #status-pedido-label {
     font-weight: 700; /* Peso da fonte */
-    color: #1f2937; /* Cor preta escura */
+    color: var(--color-text-primary); /* Cor preta escura */
     font-size: 0.875rem; /* Tamanho da fonte */
     margin-left: 0.5rem; /* Margem à esquerda para separar da lupa */
     margin-right: 0.5rem; /* Margem à direita para separar do status-display */
@@ -649,10 +720,10 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 }
 /* Ajustes para o input de busca de pedido no cabeçalho */
 #order-search-input {
-    color: #ef4444; /* Cor do texto */
-    background-color: white; /* Fundo branco para se destacar */
-    border: 1px solid #e5e7eb; /* Borda sutil */
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Sombra leve */
+    color: var(--color-danger); /* Cor do texto */
+    background-color: var(--color-surface); /* Fundo branco para se destacar */
+    border: 1px solid var(--color-border); /* Borda sutil */
+    box-shadow: var(--shadow-sm); /* Sombra leve */
 }
 /* Estilo para os botões de navegação do cabeçalho (setas, busca) */
 .header-nav-btn {
@@ -662,18 +733,18 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     display: flex; /* Para centralizar o ícone */
     align-items: center; /* Alinha verticalmente */
     justify-content: center; /* Alinha horizontalmente */
-    background-color: white; /* Fundo branco */
-    color: #4b5563; /* Cor do ícone */
-    border-radius: 9999px; /* Totalmente redondo */
+    background-color: var(--color-surface); /* Fundo branco */
+    color: var(--color-text-secondary); /* Cor do ícone */
+    border-radius: var(--border-radius-full); /* Totalmente redondo */
     font-weight: 600; /* Peso da fonte */
     transition: all 0.2s ease-in-out; /* Transição suave */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); /* Sombra 3D leve */
-    border: 1px solid #e5e7eb; /* Borda sutil */
+    box-shadow: var(--shadow-md); /* Sombra 3D leve */
+    border: 1px solid var(--color-border); /* Borda sutil */
 }
 .header-nav-btn:hover {
-    background-color: #f3f4f6; /* Leve mudança no hover */
+    background-color: var(--color-surface-hover); /* Leve mudança no hover */
     transform: translateY(-2px); /* Efeito de elevação sutil */
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.08); /* Sombra mais pronunciada no hover */
+    box-shadow: var(--shadow-lg); /* Sombra mais pronunciada no hover */
 }
 
 
@@ -683,31 +754,31 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     padding: 0.5rem 1rem; /* Espaçamento interno */
     font-weight: 600; /* Peso da fonte */
     font-size: 1rem; /* Tamanho da fonte */
-    color: #6b7280; /* Cor do texto */
+    color: var(--color-text-secondary); /* Cor do texto */
     border-bottom: 2px solid transparent; /* Borda inferior transparente */
     transition: all 0.2s ease-in-out; /* Transição suave */
 }
 .employee-report-tab:hover {
-    color: #4b5563; /* Cor do texto no hover */
+    color: var(--color-text-primary); /* Cor do texto no hover */
 }
 .employee-report-tab.active-tab {
-    color: #3b82f6 !important; /* Cor do texto quando ativo */
-    border-color: #3b82f6 !important; /* Cor da borda quando ativo */
+    color: var(--color-primary) !important; /* Cor do texto quando ativo */
+    border-color: var(--color-primary) !important; /* Cor da borda quando ativo */
 }
 
 /* Estilos para o preview do ticket */
 #ticket-preview-container {
-    background-color: #f8fafc; /* Cor de fundo */
-    border: 1px solid #e2e8f0; /* Borda */
-    border-radius: 0.75rem; /* Arredondamento da borda */
+    background-color: var(--color-surface-alt); /* Cor de fundo */
+    border: 1px solid var(--color-border); /* Borda */
+    border-radius: var(--border-radius-lg); /* Arredondamento da borda */
     padding: 1rem; /* Espaçamento interno */
     max-height: 400px; /* Altura máxima */
     overflow-y: auto; /* Rolagem vertical */
-    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada */
+    font-family: var(--font-mono); /* Fonte monoespaçada */
     font-size: 0.875rem; /* Tamanho da fonte */
     white-space: pre-wrap; /* Quebra de linha automática */
     line-height: 1.2; /* Altura da linha */
-    color: #1f2937; /* Cor do texto */
+    color: var(--color-text-primary); /* Cor do texto */
 }
 
 /* Ajustes para a view-clientes em mobile */
@@ -735,18 +806,18 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 #view-clientes table thead {
     position: sticky; /* Cabeçalho fixo ao rolar */
     top: 0; /* Posição no topo */
-    background-color: #e5e7eb; /* Cor de fundo */
+    background-color: var(--color-surface-hover); /* Cor de fundo */
     z-index: 10; /* Z-index para sobreposição */
 }
 
 /* NOVO: Estilos para o seletor de funcionário no PDV e status online */
 .online-indicator {
-    color: #f59e0b; /* Tailwind amber-500 para neon laranja */
+    color: var(--color-accent); /* Tailwind amber-500 para neon laranja */
     font-weight: 700; /* Peso da fonte */
-    text-shadow: 0 0 5px #f59e0b, 0 0 10px #f59e0b; /* Efeito neon */
+    text-shadow: 0 0 5px var(--color-accent), 0 0 10px var(--color-accent); /* Efeito neon */
 }
 .employee-switcher-selected {
-    border-color: #f59e0b; /* Borda laranja para o select quando selecionado */
+    border-color: var(--color-accent); /* Borda laranja para o select quando selecionado */
     box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5); /* Brilho laranja */
 }
 /* NOVO: Estilos para o Dropdown de Notificações */
@@ -757,9 +828,9 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     right: 0;
     width: 350px;
     max-height: 450px;
-    background-color: white;
-    border-radius: 0.75rem;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    background-color: var(--color-surface);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
     z-index: 50;
     overflow: hidden;
     flex-direction: column;
@@ -769,22 +840,22 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 }
 .notification-item {
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--color-border);
     transition: background-color 0.2s ease-in-out;
     cursor: pointer;
 }
 .notification-item:hover {
-    background-color: #f9fafb;
+    background-color: var(--color-surface-hover);
 }
 .notification-item.unread {
-    background-color: #eff6ff;
+    background-color: var(--color-primary-light);
     font-weight: 600;
 }
 
 /* --- Estilos para o Novo Painel Gerencial Moderno --- */
 #manager-sidebar {
-    background-color: #1f2937; /* bg-gray-800 */
-    color: white;
+    background-color: var(--color-sidebar-background); /* bg-gray-800 */
+    color: var(--color-sidebar-text);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -799,15 +870,15 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     display: flex;
     align-items: center;
     padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    border-radius: var(--border-radius-md);
     white-space: nowrap;
     transition: background-color 0.2s;
 }
 .sidebar-link:hover {
-    background-color: #374151; /* bg-gray-700 */
+    background-color: var(--color-sidebar-link-hover-bg); /* bg-gray-700 */
 }
 .sidebar-link.active {
-    background-color: #4f46e5; /* bg-indigo-600 */
+    background-color: var(--color-sidebar-link-active-bg); /* bg-indigo-600 */
     font-weight: 600;
 }
 .sidebar-link .sidebar-text {
@@ -862,10 +933,6 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
         transform: translateX(0);
     }
 }
-.notification-item.unread {
-    background-color: #eff6ff;
-    font-weight: 600;
-}
 
 /* Estilo para o botão de horário, para que os botões criados dinamicamente se pareçam com os outros */
 .time-slot-btn {
@@ -914,7 +981,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 /* NOVO: Estilos para as abas genéricas do painel gerencial (Relatórios, Estoque, Equipe) */
 .report-tab {
     padding: 0.75rem 1.5rem; /* Espaçamento interno */
-    border-radius: 0.5rem 0.5rem 0 0; /* Arredonda os cantos superiores */
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0; /* Arredonda os cantos superiores */
     font-weight: 600; /* Fonte em negrito */
     font-size: 0.875rem; /* Tamanho da fonte */
     transition: all 0.2s ease-in-out; /* Transição suave */
@@ -930,7 +997,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 
 /* NOVO: Estilo para o "Selo do Cliente" no painel de assistência */
 #customer-seal-container {
-    border-left: 5px solid #3b82f6; /* Borda azul para destaque */
+    border-left: 5px solid var(--color-primary); /* Borda azul para destaque */
 }
 
 /* NOVO: Estilo para o item na pré-visualização do pedido */
@@ -939,15 +1006,15 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem;
-    border-radius: 0.375rem;
-    background-color: #f9fafb; /* bg-gray-50 */
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-surface-alt); /* bg-gray-50 */
 }
 
 /* Estilo para destacar o slot de horário recém-adicionado ou encontrado */
 .highlight-slot {
     transition: all 0.3s ease-in-out;
-    background-color: #93c5fd !important; /* Azul claro do Tailwind (blue-300) */
-    border-color: #3b82f6 !important; /* Azul mais forte (blue-500) */
+    background-color: var(--color-primary-lighter) !important; /* Azul claro do Tailwind (blue-300) */
+    border-color: var(--color-primary) !important; /* Azul mais forte (blue-500) */
     transform: scale(1.05);
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
 }
@@ -958,15 +1025,15 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     justify-content: space-between;
     align-items: center;
     padding: 8px;
-    background-color: #f9fafb; /* bg-gray-50 */
-    border-radius: 8px;
-    border-left: 4px solid #3b82f6; /* border-blue-500 */
+    background-color: var(--color-surface-alt); /* bg-gray-50 */
+    border-radius: var(--border-radius-md);
+    border-left: 4px solid var(--color-primary); /* border-blue-500 */
     font-size: 0.9rem;
 }
 
 .live-order-item .item-name {
     font-weight: 600; /* font-semibold */
-    color: #1f2937; /* text-gray-800 */
+    color: var(--color-text-primary); /* text-gray-800 */
 }
 
 /* Animação para os itens do resumo ao vivo aparecerem suavemente */
@@ -1000,15 +1067,15 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
     gap: 1rem;
     align-items: center;
     padding: 0.75rem;
-    background-color: white;
-    border: 1px solid #e5e7eb; /* border-gray-200 */
-    border-radius: 0.5rem; /* rounded-lg */
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border); /* border-gray-200 */
+    border-radius: var(--border-radius-md); /* rounded-lg */
     cursor: pointer;
     transition: all 0.2s ease-in-out;
 }
 
 .alert-item:hover {
-    border-color: #f59e0b; /* border-amber-500 */
+    border-color: var(--color-accent); /* border-amber-500 */
     box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3); /* ring-amber-300 */
 }
 
@@ -1019,17 +1086,17 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 
 .alert-item-name {
     font-weight: 600; /* font-semibold */
-    color: #1f2937; /* text-gray-800 */
+    color: var(--color-text-primary); /* text-gray-800 */
 }
 
 .alert-item-details {
     font-size: 0.75rem; /* text-xs */
-    color: #6b7280; /* text-gray-500 */
+    color: var(--color-text-secondary); /* text-gray-500 */
 }
 
 .alert-item-debt {
     font-weight: 700; /* font-bold */
-    color: #ef4444; /* text-red-600 */
+    color: var(--color-danger); /* text-red-600 */
     font-size: 1rem; /* text-base */
 }
 
@@ -1040,7 +1107,7 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 
 .alert-action-btn {
     padding: 0.5rem 0.75rem;
-    border-radius: 0.375rem; /* rounded-md */
+    border-radius: var(--border-radius-sm); /* rounded-md */
     font-size: 0.75rem; /* text-xs */
     font-weight: 600; /* font-semibold */
     color: white;
@@ -1054,13 +1121,65 @@ main { flex: 1 1 auto; } /* Ocupa o espaço restante */
 }
 
 .btn-resolve {
-    background-color: #22c55e; /* bg-green-500 */
+    background-color: var(--color-success); /* bg-green-500 */
 }
 
 .btn-forward {
-    background-color: #6366f1; /* bg-indigo-500 */
+    background-color: var(--color-indigo); /* bg-indigo-500 */
 }
 
 .btn-cancel {
-    background-color: #ef4444; /* bg-red-500 */
+    background-color: var(--color-danger); /* bg-red-500 */
+}
+
+/* --- NOVOS ESTILOS PARA O BOTÃO DE TROCA DE TEMA --- */
+.theme-toggle-btn .theme-icon-sun {
+    display: block;
+}
+.theme-toggle-btn .theme-icon-moon {
+    display: none;
+}
+
+[data-theme="dark"] .theme-toggle-btn .theme-icon-sun {
+    display: none;
+}
+[data-theme="dark"] .theme-toggle-btn .theme-icon-moon {
+    display: block;
+}
+[data-theme="dark"] .theme-toggle-btn:hover {
+    color: #facc15; /* Cor amarela para o hover no tema escuro (Tailwind's yellow-400) */
+}
+
+/* --- NOVAS CLASSES SEMÂNTICAS PARA TEMAS (Correção Dark Mode) --- */
+
+/* Superfícies e Fundos */
+.surface-background {
+    background-color: var(--color-background);
+}
+.surface-card {
+    background-color: var(--color-surface);
+}
+.surface-alt {
+    background-color: var(--color-surface-alt);
+}
+.surface-hover:hover {
+    background-color: var(--color-surface-hover) !important; /* !important para sobrescrever o hover do Tailwind */
+}
+
+/* Textos */
+.text-color-primary {
+    color: var(--color-text-primary);
+}
+.text-color-secondary {
+    color: var(--color-text-secondary);
+}
+
+/* Componentes */
+.input-themed {
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border-strong);
+}
+.table-header-themed {
+    background-color: var(--color-surface-hover);
 }

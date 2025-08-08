@@ -2,8 +2,8 @@
 
 import { dom } from './domRefs.js';
 import {
-    showToast, formatCurrency, getTodayDateString, formatDateToBR,
-    formatDateTimeToBR, getProductInfoById, generateTicketText, printEmployeeReport
+    showToast, formatCurrency, getTodayDateString, formatDateToBR, formatDateTimeToBR, getProductInfoById,
+    generateTicketText, printEmployeeReport, printTomorrowReminderList, showTomorrowReminderModal
 } from './utils.js';
 import { db, currentUser, employeeReportData, productsConfig } from './app.js';
 import { fetchAllOrders } from './firebaseService.js';
@@ -72,7 +72,8 @@ function filterAndDisplayEmployeeReport() {
         filterDate.setMinutes(filterDate.getMinutes() + filterDate.getTimezoneOffset()); // Ajusto para o fuso horário local.
         dataToFilter = dataToFilter.filter(order => {
             if (!order.createdAt) return false;
-            const orderDate = order.createdAt.toDate();
+            // PADRONIZAÇÃO: order.createdAt já é um objeto Date, não precisa mais de .toDate()
+            const orderDate = order.createdAt; // Utiliza o objeto Date diretamente
             return orderDate.getFullYear() === filterDate.getFullYear() &&
                    orderDate.getMonth() === filterDate.getMonth() &&
                    orderDate.getDate() === filterDate.getDate();
@@ -340,7 +341,8 @@ export function setupEmployeeReportListeners() {
         dom.employeeReport.searchInput,
         dom.employeeReport.filterDevedor,
         dom.employeeReport.filterPago,
-        dom.employeeReport.printBtn
+        dom.employeeReport.printBtn,
+        // dom.employeeReport.printTomorrowReminderBtn // REMOVIDO: O listener para este botão agora está em app.js
     ];
 
     if (essentialElements.every(el => el)) {
@@ -358,10 +360,12 @@ export function setupEmployeeReportListeners() {
         dom.employeeReport.filterPago.addEventListener('change', reportFilterListener);
 
         dom.employeeReport.printBtn.addEventListener('click', () => printEmployeeReport()); // Chamo a função de impressão de utils.
+
+        // O listener para o botão de lembrete de amanhã foi movido para app.js (show-tomorrow-reminder-btn)
     } else {
         console.error("Elementos essenciais do relatório do funcionário não encontrados para configurar listeners.");
         essentialElements.forEach(el => {
-            if (!el) {
+            if (el === undefined || el === null) {
                 console.error(`Elemento essencial não encontrado: dom.employeeReport.${Object.keys(dom.employeeReport).find(key => dom.employeeReport[key] === el)}`);
             }
         });

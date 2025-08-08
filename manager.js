@@ -12,8 +12,11 @@ import { dom } from './domRefs.js'; // Importo o meu objeto centralizado de refe
 import { 
     showCustomConfirm, showToast,
     formatCurrency, parseCurrency, getTodayDateString,
-    formatDateToBR, formatDateTimeToBR, getProductInfoById,
-    generateTicketText, getSalgadosCountFromItems, formatInputAsCurrency
+    formatDateToBR, formatDateTimeToBR, getProductInfoById, generatePrintableTicketText,
+    generateTicketText, getSalgadosCountFromItems, formatInputAsCurrency,
+    printTomorrowReminderList,
+    openWhatsappModal, 
+    sendGroupWhatsapp
 } from './utils.js'; // Importo minhas funções utilitárias.
 import { 
     currentUser, productsConfig, storeSettings, charts,
@@ -40,20 +43,48 @@ import {
 // Importo as funções de gerenciamento de funcionários.
 import { loadEmployees, renderEmployeesManagerTab, addEmployee as employeeManagementAddEmployee, editEmployee as employeeManagementEditEmployee, deleteEmployee as employeeManagementDeleteEmployee, resetEmployeePassword, saveProductionSettings } from './employeeManagement.js'; 
 
-// Importa a função renderGerencialDashboard e a nova função de HTML da Análise de Clientes
-import { renderGerencialDashboard, createCustomerAnalysisDashboardHTML } from './manager-realtime.js';
+// AÇÃO CORRETIVA: Importo a função de inicialização do Log de Atividades para que possa ser chamada no momento da navegação.
+import { initActivityLogView } from './activityLog.js';
+
+import { initializeOrdersView, stopOrdersListener, renderGerencialDashboard } from './manager-realtime.js';
 
 // Minhas variáveis locais para este módulo.
 import { createClientGrowthChart, createClientSegmentationChart } from './charts.js';
-let allManagerOrders = []; // Uso para armazenar todos os pedidos e evitar buscas repetidas no banco.
 let stockLogs = []; // Faço cache dos logs de estoque para a view de histórico.
 let allClients = []; // Armazeno a lista de clientes para a view de clientes.
 let managerAlerts = []; // Armazeno os alertas para a view do gerente.
 let customerAnalysisDataLoaded = false; // Flag para controlar o carregamento sob demanda.
 
+let currentManagerView = null; // NOVO: Rastreia a view atual para gerenciar listeners.
+
 // Minha variável para armazenar horários adicionados manualmente por data.
 let manuallyAddedTimeSlotsByDate = new Map();
 let currentSelectedDeliveryDate = ''; // Uso para rastrear a data atualmente selecionada no PDV.
+
+/**
+ * Envia uma mensagem personalizada via WhatsApp.
+ * @param {string} phone O número de telefone.
+ * @param {string} message A mensagem.
+ */
+function handleSendWhatsapp(phone, message) {
+    if (!phone) {
+        return showToast("Número de telefone não encontrado.", "error");
+    }
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+        return showToast("Número de telefone inválido.", "error");
+    }
+    if (!message.trim()) {
+        return showToast("A mensagem não pode estar vazia.", "error");
+    }
+
+    const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+
+    if (dom.whatsapp.modal) {
+        dom.whatsapp.modal.classList.remove('active');
+    }
+}
 
 /**
  * Minha função para exibir o modal de histórico de preços de um produto.
@@ -162,6 +193,12 @@ export function triggerNotificationAnimation() {
  * @param {string} view O nome da tela que vou exibir (ex: 'dashboard', 'pedidos').
  */
 export async function navigateToManagerView(view) {
+    // AÇÃO CORRETIVA: Para o listener da view anterior se ele existir, para economizar recursos.
+    // Por exemplo, o listener de pedidos em tempo real só precisa rodar quando a tela de pedidos está visível.
+    if (currentManagerView === 'pedidos') {
+        stopOrdersListener();
+    }
+
     console.log("navigateToManagerView: Navegando para a view:", view);
     if (!dom.manager || !dom.manager.sidebar) {
         console.error("Elementos da sidebar do gerente não encontrados.");
@@ -197,12 +234,20 @@ export async function navigateToManagerView(view) {
         'master-reset': { title: "Acesso Mestra", subtitle: "Redefina a senha do usuário gerencial."}
     };
 
+    // AÇÃO CORRETIVA: Adiciono a chamada para inicializar o Log de Atividades quando a view correspondente é selecionada.
+    // Isso garante que os dados sejam carregados e exibidos na tabela, resolvendo o problema da tela em branco.
+    if (view === 'log-atividades') {
+        initActivityLogView();
+    }
     if(dom.manager && dom.manager.pageTitle && dom.manager.pageSubtitle && titles[view]) {
         dom.manager.pageTitle.textContent = titles[view].title;
         dom.manager.pageSubtitle.textContent = titles[view].subtitle;
     }
 
-    if (view === 'pedidos') loadAllOrders();
+    // AÇÃO CORRETIVA: A lógica de carregamento de pedidos agora é tratada pela função de tempo real.
+    if (view === 'pedidos') {
+        initializeOrdersView();
+    }
     if (view === 'estoque') {
         switchStockTab('repo');
     }
@@ -231,6 +276,8 @@ export async function navigateToManagerView(view) {
     if (window.innerWidth < 1024 && dom.manager && dom.manager.sidebar && dom.manager.sidebar.classList.contains('open')) {
         toggleManagerSidebar();
     }
+
+    currentManagerView = view; // Atualiza a view atual no final da navegação.
 }
 
 /**
@@ -402,9 +449,10 @@ export function setupManagerDashboardListeners() {
     dom.manager.tabEquipeMensal.addEventListener('click', () => switchTeamReportTab('equipe-mensal'));
     dom.manager.equipeMonthPicker.addEventListener('change', loadTeamMonthlyActivity);
 
+    // Listeners para o modal de WhatsApp individual
     dom.whatsapp.cancelBtn.addEventListener('click', () => dom.whatsapp.modal.classList.remove('active'));
-    dom.whatsapp.sendBtn.addEventListener('click', handleSendWhatsapp);
-
+    dom.whatsapp.sendBtn.addEventListener('click', () => handleSendWhatsapp(dom.whatsapp.modal.dataset.phone, dom.whatsapp.messageInput.value));
+    
     dom.manager.selectAllClientsCheckbox.addEventListener('change', (e) => {
         document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = e.target.checked);
         updateGroupWhatsappUI();
@@ -414,7 +462,13 @@ export function setupManagerDashboardListeners() {
             updateGroupWhatsappUI();
         }
     });
-    dom.manager.sendGroupWhatsappBtn.addEventListener('click', sendGroupWhatsapp);
+    // REMOVIDO: Função de envio de grupo duplicada
+    // dom.manager.sendGroupWhatsappBtn.addEventListener('click', sendGroupWhatsapp);
+    dom.manager.sendGroupWhatsappBtn.addEventListener('click', () => {
+        const selectedPhones = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.dataset.phone);
+        sendGroupWhatsapp(selectedPhones, dom.manager.whatsappGroupMessage.value);
+    });
+
     dom.manager.teamMemberDetailCloseBtn.addEventListener('click', () => dom.manager.teamMemberDetailModal.classList.remove('active'));
 
     dom.manager.storeNameInput.addEventListener('input', updateTicketPreview);
@@ -423,6 +477,7 @@ export function setupManagerDashboardListeners() {
     dom.manager.ticketSubtitleInput.addEventListener('input', updateTicketPreview);
     dom.manager.footerMsgInput.addEventListener('input', updateTicketPreview);
     dom.manager.printUnitPriceCheckbox.addEventListener('change', updateTicketPreview);
+    document.getElementById('manager-kibe-print-size').addEventListener('change', updateTicketPreview);
 
     if (dom.manager.firebaseAccessBtn) {
         dom.manager.firebaseAccessBtn.addEventListener('click', () => {
@@ -674,50 +729,6 @@ function toggleManagerSidebar() {
 }
 
 /**
- * Eu carrego todos os pedidos do banco de dados e os armazeno em uma variável local.
- */
-async function loadAllOrders() {
-    console.log("loadAllOrders: Carregando todos os pedidos.");
-    try {
-        allManagerOrders = await fetchAllOrders();
-        renderManagerOrdersTable(allManagerOrders);
-        console.log("loadAllOrders: Pedidos carregados com sucesso.");
-    } catch (error) {
-        console.error("loadAllOrders: Erro ao carregar todos os pedidos:", error);
-        showToast("Falha ao carregar pedidos.", "error");
-    }
-}
-
-/**
- * Eu renderizo a tabela de pedidos na tela de gestão.
- * @param {Array<object>} ordersToRender A lista de pedidos que vou exibir.
- */
-function renderManagerOrdersTable(ordersToRender) {
-    console.log("renderManagerOrdersTable: Renderizando tabela de pedidos.");
-    if (!dom.manager || !dom.manager.ordersTableBody) {
-        console.error("Elemento dom.manager.ordersTableBody não encontrado.");
-        return;
-    }
-    dom.manager.ordersTableBody.innerHTML = '';
-    ordersToRender.forEach(order => {
-        const row = dom.manager.ordersTableBody.insertRow();
-        row.className = `border-b hover:bg-gray-100 cursor-pointer transition-colors duration-200`;
-        row.dataset.orderId = order.id;
-        row.innerHTML = `
-            <td class="py-2 px-3">${order.orderNumber}</td>
-            <td class="py-2 px-3">${formatDateToBR(order.createdAt)}</td>
-            <td class="py-2 px-3">${order.customer?.name || 'N/A'}</td>
-            <td class="py-2 px-3">${formatCurrency(order.total)}</td>
-            <td class="py-2 px-3"><span class="px-2 py-1 text-xs rounded-full ${order.status === 'cancelado' ? 'bg-red-200 text-red-800' : 'bg-blue-200 text-blue-800'}">${order.status || 'N/A'}</span></td>
-            <td class="py-2 px-3">${order.createdBy?.name || 'N/A'}</td>
-            <td class="py-2 px-3">${order.settledBy?.name || '---'}</td>
-        `;
-        row.addEventListener('dblclick', () => showOrderDetailModal(order.id));
-    });
-    console.log("renderManagerOrdersTable: Tabela de pedidos renderizada.");
-}
-
-/**
  * Eu filtro a lista de pedidos com base no termo de busca digitado.
  */
 function filterManagerOrdersTable() {
@@ -728,7 +739,10 @@ function filterManagerOrdersTable() {
     }
     const searchTerm = dom.manager.filterSearchAll.value.toLowerCase();
 
-    const filteredOrders = allManagerOrders.filter(order => {
+    // AÇÃO CORRETIVA: Filtra as linhas da tabela diretamente no DOM, pois não há mais uma lista `allManagerOrders`.
+    const rows = dom.manager.ordersTableBody.getElementsByTagName('tr');
+    Array.from(rows).forEach(row => {
+        const orderText = row.textContent || row.innerText;
         const searchString = [
             String(order.orderNumber),
             order.customer?.name || '',
@@ -737,10 +751,8 @@ function filterManagerOrdersTable() {
             order.settledBy?.name || ''
         ].join(' ').toLowerCase();
 
-        return searchString.includes(searchTerm);
+        row.style.display = orderText.toLowerCase().includes(searchTerm) ? '' : 'none';
     });
-
-    renderManagerOrdersTable(filteredOrders);
 }
 
 /**
@@ -766,6 +778,15 @@ export async function showOrderDetailModal(orderId) {
         return `<div class="flex justify-between text-sm"><p>${item.quantity} ${itemName}</p><p>${formatCurrency(item.subtotal)}</p></div>`;
     }).join('');
 
+    // NOVO: Cria o HTML para as observações, se existirem.
+    let observationsHtml = '';
+    if (order.observations) {
+        observationsHtml = `
+            <hr class="my-4">
+            <div><p class="font-semibold">Observações:</p><p class="bg-yellow-50 p-2 rounded border border-yellow-200 text-gray-700 whitespace-pre-wrap">${order.observations}</p></div>
+        `;
+    }
+
     dom.manager.detailOrderContent.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
             <div><p class="font-semibold">Cliente:</p><p>${order.customer?.name}</p></div>
@@ -776,6 +797,7 @@ export async function showOrderDetailModal(orderId) {
             <div><p class="font-semibold">Recebedor:</p><p>${order.settledBy?.name || '---'}</p></div>
             <div><p class="font-semibold">Status Dívida:</p><p class="font-bold ${order.paymentStatus === 'pago' ? 'text-green-600' : 'text-orange-600'}">${order.paymentStatus === 'pago' ? 'SALDO TOTAL PAGO' : 'SALDO EM ABERTO'}</p></div>
         </div>
+        ${observationsHtml}
         <hr class="my-4">
         <h3 class="font-bold mb-2">Itens do Pedido:</h3>
         <div class="space-y-1">${itemsHtml}</div>
@@ -1054,56 +1076,6 @@ async function loadTeamMonthlyActivity() {
     }
 }
 
-// Funções de WhatsApp
-function openWhatsappModal(phone, name) {
-    console.log("openWhatsappModal: Abrindo modal WhatsApp para:", name);
-    if (!dom.whatsapp || !dom.whatsapp.modal || !dom.whatsapp.clientName || !dom.whatsapp.messageInput) {
-        console.error("Elementos do modal WhatsApp não encontrados.");
-        return;
-    }
-    dom.whatsapp.modal.dataset.phone = phone;
-    dom.whatsapp.clientName.textContent = name;
-    dom.whatsapp.messageInput.value = `Olá ${name}, tudo bem?`;
-    dom.whatsapp.modal.classList.add('active');
-}
-
-function handleSendWhatsapp() {
-    console.log("handleSendWhatsapp: Iniciando envio de mensagem WhatsApp do modal.");
-    if (!dom.whatsapp || !dom.whatsapp.modal || !dom.whatsapp.messageInput) {
-        console.error("Elementos do modal WhatsApp não encontrados para envio.");
-        return;
-    }
-    const phoneRaw = dom.whatsapp.modal.dataset.phone;
-    if (!phoneRaw) {
-        showToast("Telefone do cliente não informado no modal.", "error");
-        console.error("handleSendWhatsapp: Telefone do cliente não encontrado no dataset do modal.");
-        return;
-    }
-    const phone = phoneRaw.replace(/\D/g, '');
-    if (phone.length < 10) {
-        showToast("Número de telefone inválido. Verifique o DDD e o número.", "error");
-        console.error("handleSendWhatsapp: Número de telefone inválido:", phoneRaw);
-        return;
-    }
-
-    const message = dom.whatsapp.messageInput.value;
-    if (!message.trim()) {
-        showToast("Por favor, digite uma mensagem para enviar.", "error");
-        console.error("handleSendWhatsapp: Mensagem para envio está vazia.");
-        return;
-    }
-
-    const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
-    console.log("handleSendWhatsapp: Abrindo URL do WhatsApp:", whatsappUrl);
-
-    try {
-        window.open(whatsappUrl, '_blank');
-        dom.whatsapp.modal.classList.remove('active');
-    } catch (e) {
-        console.error("handleSendWhatsapp: Erro ao abrir janela do WhatsApp:", e);
-        showToast("Não foi possível abrir o WhatsApp. Verifique as permissões do navegador.", "error");
-    }
-}
 
 function updateGroupWhatsappUI() {
     if (!dom.manager || !dom.manager.selectedClientsCount || !dom.manager.sendGroupWhatsappBtn || !dom.manager.whatsappGroupMessage) {
@@ -1123,51 +1095,6 @@ function updateGroupWhatsappUI() {
  */
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-async function sendGroupWhatsapp() {
-    console.log("sendGroupWhatsapp: Iniciando envio de mensagem em grupo WhatsApp.");
-    const { whatsappGroupMessage, sendGroupWhatsappBtn } = dom.manager;
-
-    if (!whatsappGroupMessage || !sendGroupWhatsappBtn) {
-        console.error("Elementos de envio de grupo WhatsApp não encontrados.");
-        return;
-    }
-
-    const message = whatsappGroupMessage.value;
-    if (!message.trim()) {
-        return showToast("Por favor, digite uma mensagem para enviar.", "error");
-    }
-
-    const selectedCheckboxes = document.querySelectorAll('.client-checkbox:checked');
-    if (selectedCheckboxes.length === 0) {
-        return showToast("Nenhum cliente selecionado.", "error");
-    }
-
-    sendGroupWhatsappBtn.disabled = true;
-    const originalButtonText = sendGroupWhatsappBtn.innerHTML;
-
-    try {
-        for (let i = 0; i < selectedCheckboxes.length; i++) {
-            const cb = selectedCheckboxes[i];
-            const phoneRaw = cb.dataset.phone;
-            const phone = phoneRaw ? phoneRaw.replace(/\D/g, '') : '';
-
-            if (phone.length >= 10) {
-                sendGroupWhatsappBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Enviando ${i + 1} de ${selectedCheckboxes.length}`;
-                window.open(whatsappUrl, '_blank');
-                await delay(3000);
-            } else {
-                console.warn(`Número de telefone inválido ou ausente para um cliente selecionado: ${phoneRaw}`);
-            }
-        }
-        showToast("Envio em massa concluído!", "success");
-    } catch (error) {
-        console.error("Erro durante o envio em massa:", error);
-        showToast("Ocorreu um erro durante o envio.", "error");
-    } finally {
-        sendGroupWhatsappBtn.disabled = false;
-        sendGroupWhatsappBtn.innerHTML = originalButtonText;
-    }
-}
 
 // Funções de Gerenciamento do Sistema
 export function goToPdv() {
@@ -1547,6 +1474,7 @@ function loadTicketSettings() {
     dom.manager.ticketSubtitleInput.value = storeSettings.ticketSubtitle || '(NAO E DOCUMENTO FISCAL)';
     dom.manager.footerMsgInput.value = storeSettings.footerMessage || '';
     dom.manager.printUnitPriceCheckbox.checked = storeSettings.printUnitPrice || false;
+    document.getElementById('manager-kibe-print-size').value = storeSettings.kibePrintSize || '3x';
     updateTicketPreview();
 }
 async function saveTicketSettings() {
@@ -1562,7 +1490,8 @@ async function saveTicketSettings() {
         ticketTitle: dom.manager.ticketTitleInput.value,
         ticketSubtitle: dom.manager.ticketSubtitleInput.value,
         footerMessage: dom.manager.footerMsgInput.value,
-        printUnitPrice: dom.manager.printUnitPriceCheckbox.checked
+        printUnitPrice: dom.manager.printUnitPriceCheckbox.checked,
+        kibePrintSize: document.getElementById('manager-kibe-print-size').value
     };
     try {
         await firebaseSaveTicketSettings(newStoreSettings);
@@ -1586,7 +1515,8 @@ function updateTicketPreview() {
         ticketTitle: dom.manager.ticketTitleInput.value || 'COMPROVANTE DE PEDIDO',
         ticketSubtitle: dom.manager.ticketSubtitleInput.value || '(NAO E DOCUMENTO FISCAL)',
         footerMessage: dom.manager.footerMsgInput.value || 'Obrigado(a) pela preferência!',
-        printUnitPrice: dom.manager.printUnitPriceCheckbox.checked
+        printUnitPrice: dom.manager.printUnitPriceCheckbox.checked,
+        kibePrintSize: document.getElementById('manager-kibe-print-size').value
     };
 
     const exampleOrder = {
@@ -1597,18 +1527,19 @@ function updateTicketPreview() {
         createdAt: { toDate: () => new Date() },
         items: [
             { id: 'coxinha_frita', name: 'Coxinha (Frita)', quantity: 10, unitPrice: 0.70, subtotal: 7.00, category: 'fritos' },
+            { id: 'kibe_frito', name: 'Kibe (Frito)', quantity: 15, unitPrice: 0.70, subtotal: 10.50, category: 'fritos' },
             { id: 'esfiha_carne', name: 'Esfiha Carne', quantity: 5, unitPrice: 1.50, subtotal: 7.50, category: 'assados' },
             { id: 'picole_chocolate', name: 'Picolé Chocolate', quantity: 2, unitPrice: 3.00, subtotal: 6.00, category: 'revenda' },
             { id: 'manual_1', name: 'Refrigerante 2L', quantity: 1, unitPrice: 10.00, subtotal: 10.00, isManual: true, category: 'manual' }
         ],
-        total: 30.50,
+        total: 44.00,
         sinal: 10.00,
-        restante: 20.50
+        restante: 34.00
     };
 
     const originalStoreSettings = { ...storeSettings };
     Object.assign(storeSettings, previewSettings);
-    dom.manager.ticketPreviewContainer.textContent = generateSimpleTicketTextForWhatsapp(exampleOrder); // Use a versão de texto simples para o preview
+    dom.manager.ticketPreviewContainer.innerHTML = generatePrintableTicketText(exampleOrder); // Usa a função de impressão/preview com HTML
     Object.assign(storeSettings, originalStoreSettings);
 }
 
@@ -1949,21 +1880,6 @@ async function handleManagerAlertAction(e) {
  */
 export async function populateCustomerAnalysisData() {
     console.log("Iniciando a população da aba de Análise de Clientes.");
-    
-    const customerAnalysisContainer = document.getElementById('content-analise-clientes');
-    if (!customerAnalysisContainer) {
-        console.error("Container da Análise de Clientes (#content-analise-clientes) não encontrado. Não é possível injetar HTML ou popular dados.");
-        // Se o container principal não existe, não há como prosseguir.
-        showToast("Erro: Container da Análise de Clientes não encontrado.", "error");
-        return;
-    }
-
-    // PASSO NOVO E CRÍTICO: Injete o HTML do esqueleto da Análise de Clientes
-    // Isso garante que todos os elementos internos existam ANTES de tentarmos acessá-los.
-    customerAnalysisContainer.innerHTML = createCustomerAnalysisDashboardHTML();
-    console.log("HTML do esqueleto da Análise de Clientes injetado no container.");
-
-    // Agora, podemos obter as referências aos elementos internos com segurança.
     const kpiTotal = document.getElementById('kpi-total-clientes');
     const kpiNovos = document.getElementById('kpi-novos-clientes');
     const kpiRecorrentes = document.getElementById('kpi-clientes-recorrentes');
@@ -1972,19 +1888,18 @@ export async function populateCustomerAnalysisData() {
     const clientGrowthCanvas = document.getElementById('client-growth-chart');
     const clientSegmentationCanvas = document.getElementById('client-segmentation-chart');
 
-    // Uma verificação de segurança adicional, embora agora os elementos devam existir.
     if (!kpiTotal || !topClientsTable || !clientGrowthCanvas || !clientSegmentationCanvas) {
-        console.error("Elementos internos da aba de Análise de Clientes não encontrados após injeção do HTML. Pulando a população de dados.");
-        // Se, por algum motivo, ainda não encontrar, exiba uma mensagem de erro no próprio container.
-        customerAnalysisContainer.innerHTML = `<div class="text-center p-8 bg-red-50 text-red-700 rounded-lg">
-            <p class="font-bold">Erro ao carregar o painel.</p>
-            <p>Não foi possível encontrar os elementos internos necessários para exibir a análise de clientes.</p>
-            <p class="text-sm mt-2">Verifique o console para mais detalhes.</p>
-        </div>`;
+        console.log("Elementos da aba de Análise de Clientes não encontrados. Pulando a população de dados.");
+        const contentPanel = document.getElementById('tab-content-clientes');
+        if (contentPanel) {
+            contentPanel.innerHTML = `<div class="text-center p-8 bg-red-50 text-red-700 rounded-lg">
+                <p class="font-bold">Erro ao carregar o painel.</p>
+                <p>Não foi possível encontrar os elementos necessários para exibir a análise de clientes.</p>
+            </div>`;
+        }
         return;
     }
 
-    // Exiba estados de carregamento iniciais
     kpiTotal.textContent = '...';
     kpiNovos.textContent = '...';
     kpiRecorrentes.textContent = '...';
