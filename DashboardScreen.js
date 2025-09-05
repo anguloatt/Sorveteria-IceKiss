@@ -26,7 +26,11 @@ export function initDashboardScreen() {
             </div>
 
             <!-- Painéis de Conteúdo das Abas -->
+<<<<<<< HEAD
             <div id="dashboard-tab-content" class="p-6 space-y-6 overflow-y-auto text-color-primary">
+=======
+            <div id="dashboard-tab-content" class="p-6 space-y-6 overflow-y-auto">
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                 <!-- Aba: Visão Geral (será preenchida por manager-realtime.js) -->
                 <div id="tab-content-visao-geral" class="dashboard-tab-panel">
                     <!-- O conteúdo da Visão Geral será carregado aqui dinamicamente. -->
@@ -34,17 +38,29 @@ export function initDashboardScreen() {
                 
                 <!-- Aba: Análise Financeira (Placeholder) -->
                 <div id="tab-content-financeiro" class="dashboard-tab-panel hidden">
+<<<<<<< HEAD
                      <div class="flex flex-col items-center justify-center h-64 surface-alt rounded-lg">
                         <i class="fas fa-chart-line text-4xl text-gray-400 mb-4"></i>
                         <p class="text-color-secondary">O novo relatório de <strong>Análise Financeira</strong> será construído aqui em uma fase futura.</p>
+=======
+                     <div class="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-lg">
+                        <i class="fas fa-chart-line text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">O novo relatório de <strong>Análise Financeira</strong> será construído aqui em uma fase futura.</p>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                     </div>
                 </div>
 
                 <!-- Aba: Análise de Produtos (Placeholder) -->
                 <div id="tab-content-produtos" class="dashboard-tab-panel hidden">
+<<<<<<< HEAD
                      <div class="flex flex-col items-center justify-center h-64 surface-alt rounded-lg">
                         <i class="fas fa-tags text-4xl text-gray-400 mb-4"></i>
                         <p class="text-color-secondary">O novo relatório de <strong>Análise de Produtos</strong> será construído aqui em uma fase futura.</p>
+=======
+                     <div class="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-lg">
+                        <i class="fas fa-tags text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">O novo relatório de <strong>Análise de Produtos</strong> será construído aqui em uma fase futura.</p>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                     </div>
                 </div>
 

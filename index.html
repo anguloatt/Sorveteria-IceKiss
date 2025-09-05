@@ -110,11 +110,15 @@
                         <span id="pending-orders-count">0</span>
                         <span>pendente(s)</span>
                     </span>
+<<<<<<< HEAD
                     <button id="change-password-btn" class="text-color-secondary hover:text-blue-600 text-lg" title="Alterar Senha"><i class="fas fa-key"></i></button>
                     <!-- NOVO: Botão de troca de tema -->
                     <button class="theme-toggle-btn text-gray-500 hover:text-orange-500 text-lg p-2 rounded-full transition-colors" title="Alterar Tema">
                         <i class="fas fa-sun theme-icon-sun"></i><i class="fas fa-moon theme-icon-moon"></i>
                     </button>
+=======
+                    <button id="change-password-btn" class="text-gray-500 hover:text-blue-600 text-lg" title="Alterar Senha"><i class="fas fa-key"></i></button>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                 </div>
                 <button id="manager-access-btn" class="text-gray-600 hover:text-orange-600 text-2xl" title="Acesso Gerencial Rápido"><i class="fas fa-user-shield pointer-events-none"></i></button>
                 
@@ -145,10 +149,17 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> 
                             <!-- NOVO: Adicionado um container 'relative' para posicionar as sugestões -->
                             <div class="relative">
+<<<<<<< HEAD
                                 <input type="text" id="customer-name" placeholder="Nome e Sobrenome" class="input-themed w-full px-4 py-2 rounded-lg text-base" autocomplete="off">
                                 <div id="autocomplete-suggestions" class="absolute z-20 w-full surface-card border border-themed rounded-b-lg shadow-lg hidden max-h-60 overflow-y-auto"></div>
                             </div>
                             <input type="text" id="customer-phone" placeholder="Telefone com DDD" class="input-themed px-4 py-2 rounded-lg text-base">
+=======
+                                <input type="text" id="customer-name" placeholder="Nome e Sobrenome" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-base" autocomplete="off">
+                                <div id="autocomplete-suggestions" class="absolute z-20 w-full bg-white border border-gray-300 rounded-b-lg shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                            </div>
+                            <input type="text" id="customer-phone" placeholder="Telefone com DDD" class="px-4 py-2 border border-gray-300 rounded-lg text-base">
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                             <div class="flex items-center">
                                 <input type="date" id="delivery-date" class="input-themed px-4 py-2 rounded-lg text-base w-1/2">
                                 <span id="delivery-date-weekday" class="text-sm text-color-secondary ml-1 w-1/2 flex-shrink-0"></span>
@@ -161,7 +172,11 @@
                             </div>
                         </div>
                         <div class="mt-4">
+<<<<<<< HEAD
                             <textarea id="order-observations" rows="2" class="input-themed w-full px-4 py-2 rounded-lg text-base" placeholder="Observações do Pedido Ex: Cliente pediu para caprichar no recheio..."></textarea>
+=======
+                            <textarea id="order-observations" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-base" placeholder="Observações do Pedido Ex: Cliente pediu para caprichar no recheio..."></textarea>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                         </div>
                         <div id="client-history-heading" class="mt-4 mb-2 hidden">
                             <h3 class="text-md font-semibold text-color-primary">Histórico Cliente</h3>
@@ -532,6 +547,7 @@
                     </div>
                      <!-- View: Impressão -->
                     <div id="view-impressao" class="hidden space-y-8">
+<<<<<<< HEAD
                         <div class="surface-card p-6 rounded-xl shadow-lg">
                             <h3 class="text-xl font-bold mb-4 border-b pb-2">Configurações do Ticket de Impressão</h3>
                             <div class="lg:flex lg:space-x-8 lg:items-start">
@@ -543,6 +559,19 @@
                                     <div>
                                         <label for="manager-footer-msg" class="block font-semibold mb-1">Mensagem de Rodapé</label>
                                         <textarea id="manager-footer-msg" class="input-themed w-full px-4 py-2 rounded-lg" rows="5" placeholder="Ex: Obrigado pela compra! Volte sempre!"></textarea>
+=======
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Configurações do Ticket de Impressão</h3>
+                            <div class="lg:flex lg:space-x-8 lg:items-start">
+                                <div class="space-y-6 lg:w-1/2">
+                                    <div><label for="manager-store-name" class="block font-semibold mb-1">Nome da Loja (Cabeçalho)</label><input type="text" id="manager-store-name" class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label for="manager-store-phone" class="block font-semibold mb-1">Telefone da Loja (Cabeçalho)</label><input type="text" id="manager-store-phone" class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label for="manager-ticket-title" class="block font-semibold mb-1">Título do Comprovante</label><input type="text" id="manager-ticket-title" class="w-full px-4 py-2 border rounded-lg" placeholder="Ex: COMPROVANTE DE PEDIDO"></div>
+                                    <div><label for="manager-ticket-subtitle" class="block font-semibold mb-1">Subtítulo do Comprovante</label><input type="text" id="manager-ticket-subtitle" class="w-full px-4 py-2 border rounded-lg" placeholder="Ex: (NAO E DOCUMENTO FISCAL)"></div>
+                                    <div>
+                                        <label for="manager-footer-msg" class="block font-semibold mb-1">Mensagem de Rodapé</label>
+                                        <textarea id="manager-footer-msg" class="w-full px-4 py-2 border rounded-lg" rows="5" placeholder="Ex: Obrigado pela compra! Volte sempre!"></textarea>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                                     </div>
                                     <div class="flex items-center gap-4">
                                         <input type="checkbox" id="manager-print-unit-price" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
@@ -550,7 +579,11 @@
                                     </div>
                                     <div class="border-t pt-4 mt-4">
                                         <label for="manager-kibe-print-size" class="block font-semibold mb-1">Destaque "KIBE" (se houver no pedido)</label>
+<<<<<<< HEAD
                                         <select id="manager-kibe-print-size" class="input-themed w-full px-4 py-2 rounded-lg">
+=======
+                                        <select id="manager-kibe-print-size" class="w-full px-4 py-2 border rounded-lg bg-gray-50">
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                                             <option value="disabled">Desativado</option>
                                             <option value="1x">Tamanho 1 (Normal)</option>
                                             <option value="2x">Tamanho 2 (Grande)</option>
@@ -562,7 +595,11 @@
                                     <button id="manager-save-ticket-btn" class="mt-4 bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700">Salvar Informações do Ticket</button>
                                 </div>
                                 <div class="mt-8 lg:mt-0 p-4 bg-gray-50 rounded-xl shadow-inner lg-w-1/2">
+<<<<<<< HEAD
                                     <h3 class="text-lg font-semibold mb-3 text-color-primary">Pré-visualização do Ticket</h3>
+=======
+                                    <h3 class="text-lg font-semibold mb-3">Pré-visualização do Ticket</h3>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                                     <div id="ticket-preview-container">
                                     </div>
                                 </div>
@@ -842,10 +879,17 @@
     </div>
     
     <div id="reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+<<<<<<< HEAD
         <div class="surface-card p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
             <div id="reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
                 <div id="reminder-weekday-highlight" class="text-center text-4xl font-bold text-blue-600 mb-4 uppercase tracking-wider"></div> 
                 <h2 id="reminder-title" class="text-2xl md:text-3xl font-bold text-color-primary mb-2">Lembrete de Produção (HOJE)</h2>
+=======
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
+            <div id="reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
+                <div id="reminder-weekday-highlight" class="text-center text-4xl font-bold text-blue-600 mb-4 uppercase tracking-wider"></div> 
+                <h2 id="reminder-title" class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Lembrete de Produção (HOJE)</h2>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                 <p class="text-gray-600 mb-6">Pedidos com retirada para hoje (<span id="reminder-date"></span>)</p>
                 <div class="bg-sky-50 p-4 rounded-lg mb-6">
                     <h3 class="text-xl font-semibold mb-3 text-sky-800">Total de Itens para Produzir</h3>
@@ -862,10 +906,17 @@
             </div>
         </div>
     </div>
+<<<<<<< HEAD
     <div id="whatsapp-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[101]"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-xl font-bold mb-4">Enviar Mensagem para <span id="whatsapp-client-name" class="text-blue-600"></span></h2><textarea id="whatsapp-message-input" class="input-themed w-full p-2 rounded-lg mb-4" rows="5" placeholder="Digite sua mensagem aqui..."></textarea><div class="flex justify-end gap-4"><button id="whatsapp-modal-cancel" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="whatsapp-modal-send" class="bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600">Enviar</button></div></div></div>
     <div id="ticket-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-40"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-2xl font-bold mb-4 text-center no-print">Opções de Comprovante</h2><div class="surface-alt p-4 rounded-lg border max-h-96 overflow-y-auto printable-area"><pre id="ticket-content" class="whitespace-pre-wrap text-sm" style="font-family: 'Courier New', Courier, monospace;"></pre></div><div class="mt-6 grid grid-cols-2 gap-4 no-print"><button id="ticket-print-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button><button id="ticket-whatsapp-btn" class="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600"><i class="fab fa-whatsapp mr-2"></i>WhatsApp</button></div><button id="close-ticket-modal-btn" class="w-full mt-4 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 no-print">Fechar</button></div></div>
     <div id="manager-order-detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 h-5/6 flex flex-col"><h2 class="text-2xl font-bold mb-4 text-center">Detalhes do Pedido <span id="detail-order-number"></span></h2><div id="detail-order-content" class="flex-1 overflow-y-auto space-y-4"></div><div class="mt-6 flex justify-end gap-4"><button id="detail-reactivate-btn" class="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 hidden">Reativar Pedido</button><button id="detail-release-edit-btn" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 hidden">Liberar Edição (Gerência)</button><button id="detail-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button></div></div></div>
     <div id="custom-confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[110]"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-sm mx-4 text-center"><h3 class="text-xl font-bold mb-4 text-color-primary" id="confirm-modal-title"></h3><p class="text-color-secondary mb-6" id="confirm-modal-message"></p><div id="confirm-modal-input-container" class="mb-4 hidden space-y-2"><input type="text" id="confirm-modal-input-user" class="input-themed w-full px-4 py-2 rounded-lg" placeholder="Usuário"><input type="password" id="confirm-modal-input-pass" class="input-themed w-full px-4 py-2 rounded-lg" placeholder="Senha"></div><div class="flex justify-center gap-4"><button id="confirm-modal-cancel-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="confirm-modal-ok-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">Confirmar</button></div></div></div>
+=======
+    <div id="whatsapp-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[101]"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-xl font-bold mb-4">Enviar Mensagem para <span id="whatsapp-client-name" class="text-blue-600"></span></h2><textarea id="whatsapp-message-input" class="w-full p-2 border rounded-lg mb-4" rows="5" placeholder="Digite sua mensagem aqui..."></textarea><div class="flex justify-end gap-4"><button id="whatsapp-modal-cancel" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="whatsapp-modal-send" class="bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600">Enviar</button></div></div></div>
+    <div id="ticket-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-40"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-2xl font-bold mb-4 text-center no-print">Opções de Comprovante</h2><div class="bg-gray-50 p-4 rounded-lg border max-h-96 overflow-y-auto printable-area"><pre id="ticket-content" class="whitespace-pre-wrap text-sm" style="font-family: 'Courier New', Courier, monospace;"></pre></div><div class="mt-6 grid grid-cols-2 gap-4 no-print"><button id="ticket-print-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button><button id="ticket-whatsapp-btn" class="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600"><i class="fab fa-whatsapp mr-2"></i>WhatsApp</button></div><button id="close-ticket-modal-btn" class="w-full mt-4 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 no-print">Fechar</button></div></div>
+    <div id="manager-order-detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 h-5/6 flex flex-col"><h2 class="text-2xl font-bold mb-4 text-center">Detalhes do Pedido <span id="detail-order-number"></span></h2><div id="detail-order-content" class="flex-1 overflow-y-auto space-y-4"></div><div class="mt-6 flex justify-end gap-4"><button id="detail-reactivate-btn" class="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 hidden">Reativar Pedido</button><button id="detail-release-edit-btn" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 hidden">Liberar Edição (Gerência)</button><button id="detail-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button></div></div></div>
+    <div id="custom-confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[110]"><div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm mx-4 text-center"><h3 class="text-xl font-bold mb-4 text-gray-800" id="confirm-modal-title"></h3><p class="text-gray-600 mb-6" id="confirm-modal-message"></p><div id="confirm-modal-input-container" class="mb-4 hidden space-y-2"><input type="text" id="confirm-modal-input-user" class="w-full px-4 py-2 border rounded-lg" placeholder="Usuário"><input type="password" id="confirm-modal-input-pass" class="w-full px-4 py-2 border rounded-lg" placeholder="Senha"></div><div class="flex justify-center gap-4"><button id="confirm-modal-cancel-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="confirm-modal-ok-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">Confirmar</button></div></div></div>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
     
     <div id="employee-report-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-40">
         <div class="surface-card p-4 md:p-6 rounded-2xl shadow-2xl w-full max-w-[95%] h-[95%] flex flex-col">
@@ -958,10 +1009,17 @@
 
     <!-- NOVO MODAL PARA LEMBRETE DE AMANHÃ -->
     <div id="tomorrow-reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+<<<<<<< HEAD
         <div class="surface-card p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
             <div id="tomorrow-reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
                 <div id="tomorrow-reminder-weekday-highlight" class="text-center text-4xl font-bold text-purple-600 mb-4 uppercase tracking-wider"></div>
                 <h2 id="tomorrow-reminder-title" class="text-2xl md:text-3xl font-bold text-color-primary mb-2">Lembrete de Produção (Amanhã)</h2>
+=======
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
+            <div id="tomorrow-reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
+                <div id="tomorrow-reminder-weekday-highlight" class="text-center text-4xl font-bold text-purple-600 mb-4 uppercase tracking-wider"></div>
+                <h2 id="tomorrow-reminder-title" class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Lembrete de Produção (Amanhã)</h2>
+>>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                 <p class="text-gray-600 mb-6">Pedidos com retirada para amanhã (<span id="tomorrow-reminder-date"></span>)</p>
                 <div class="bg-purple-50 p-4 rounded-lg mb-6">
                     <h3 class="text-xl font-semibold mb-3 text-purple-800">Total de Itens para Produzir</h3>
