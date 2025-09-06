@@ -47,6 +47,7 @@ import { loadEmployees, renderEmployeesManagerTab, addEmployee as employeeManage
 import { initActivityLogView } from './activityLog.js';
 
 import { initializeOrdersView, stopOrdersListener, renderGerencialDashboard } from './manager-realtime.js';
+import { showOrderDetailModal, populateCustomerAnalysisData } from './manager-shared.js';
 
 // Minhas variáveis locais para este módulo.
 import { createClientGrowthChart, createClientSegmentationChart } from './charts.js';
@@ -759,65 +760,7 @@ function filterManagerOrdersTable() {
  * Eu busco os dados de um pedido específico e exibo seus detalhes em um modal.
  * @param {string} orderId O ID do pedido que vou mostrar.
  */
-export async function showOrderDetailModal(orderId) {
-    console.log("showOrderDetailModal: Exibindo detalhes do pedido:", orderId);
-    if (!dom.manager || !dom.manager.detailOrderNumber || !dom.manager.detailOrderContent || !dom.manager.detailReactivateBtn || !dom.manager.detailReleaseEditBtn || !dom.manager.orderDetailModal) {
-        console.error("Elementos do modal de detalhes do pedido não encontrados.");
-        return;
-    }
-    const orderRef = doc(db, "orders", orderId);
-    const orderSnap = await getDoc(orderRef);
-    if (!orderSnap.exists()) {
-        return showToast("Pedido não encontrado.", "error");
-    }
-    const order = orderSnap.data();
-    dom.manager.detailOrderNumber.textContent = `#${order.orderNumber}`;
-
-    let itemsHtml = (order.items || []).map(item => {
-        const itemName = item.isManual ? item.name : getProductInfoById(item.id)?.name || 'Produto Desconhecido';
-        return `<div class="flex justify-between text-sm"><p>${item.quantity} ${itemName}</p><p>${formatCurrency(item.subtotal)}</p></div>`;
-    }).join('');
-
-    // NOVO: Cria o HTML para as observações, se existirem.
-    let observationsHtml = '';
-    if (order.observations) {
-        observationsHtml = `
-            <hr class="my-4">
-            <div><p class="font-semibold">Observações:</p><p class="bg-yellow-50 p-2 rounded border border-yellow-200 text-gray-700 whitespace-pre-wrap">${order.observations}</p></div>
-        `;
-    }
-
-    dom.manager.detailOrderContent.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-            <div><p class="font-semibold">Cliente:</p><p>${order.customer?.name}</p></div>
-            <div><p class="font-semibold">Telefone:</p><p>${order.customer?.phone}</p></div>
-            <div><p class="font-semibold">Data da Solicitação:</p><p>${formatDateTimeToBR(order.createdAt)}</p></div>
-            <div><p class="font-semibold">Data da Retirada:</p><p>${order.delivery?.date} às ${order.delivery?.time}</p></div>
-            <div><p class="font-semibold">Vendedor:</p><p>${order.createdBy?.name || 'N/A'}</p></div>
-            <div><p class="font-semibold">Recebedor:</p><p>${order.settledBy?.name || '---'}</p></div>
-            <div><p class="font-semibold">Status Dívida:</p><p class="font-bold ${order.paymentStatus === 'pago' ? 'text-green-600' : 'text-orange-600'}">${order.paymentStatus === 'pago' ? 'SALDO TOTAL PAGO' : 'SALDO EM ABERTO'}</p></div>
-        </div>
-        ${observationsHtml}
-        <hr class="my-4">
-        <h3 class="font-bold mb-2">Itens do Pedido:</h3>
-        <div class="space-y-1">${itemsHtml}</div>
-        <hr class="my-4">
-        <div class="text-right space-y-2 text-lg">
-            <div class="flex justify-end gap-4"><p class="font-semibold">Valor a Pagar:</p><p>${formatCurrency(order.total)}</p></div>
-            <div class="flex justify-end gap-4"><p class="font-semibold">Sinal:</p><p>${formatCurrency(order.sinal)}</p></div>
-            <div class="flex justify-end gap-4 font-bold text-red-600"><p>Valor em Aberto:</p><p>${formatCurrency(order.restante)}</p></div>
-        </div>
-    `;
-
-    const isManager = currentUser.role === 'gerente' || currentUser.role === 'manager_in_pdv';
-    dom.manager.detailReactivateBtn.classList.toggle('hidden', order.status !== 'cancelado' || !isManager);
-    dom.manager.detailReactivateBtn.dataset.orderId = orderId;
-
-    dom.manager.detailReleaseEditBtn.classList.toggle('hidden', !isManager);
-    dom.manager.detailReleaseEditBtn.dataset.orderId = orderId;
-
-    dom.manager.orderDetailModal.classList.add('active');
-}
+// showOrderDetailModal function moved to manager-shared.js to avoid circular imports
 
 // Carrega e exibe a lista de clientes
 async function loadClients() {
@@ -1878,122 +1821,7 @@ async function handleManagerAlertAction(e) {
 /**
  * Popula a aba "Análise de Clientes" no dashboard gerencial com KPIs e a lista de top clientes.
  */
-export async function populateCustomerAnalysisData() {
-    console.log("Iniciando a população da aba de Análise de Clientes.");
-    const kpiTotal = document.getElementById('kpi-total-clientes');
-    const kpiNovos = document.getElementById('kpi-novos-clientes');
-    const kpiRecorrentes = document.getElementById('kpi-clientes-recorrentes');
-    const kpiRetencao = document.getElementById('kpi-taxa-retencao');
-    const topClientsTable = document.getElementById('top-clients-table-body');
-    const clientGrowthCanvas = document.getElementById('client-growth-chart');
-    const clientSegmentationCanvas = document.getElementById('client-segmentation-chart');
-
-    if (!kpiTotal || !topClientsTable || !clientGrowthCanvas || !clientSegmentationCanvas) {
-        console.log("Elementos da aba de Análise de Clientes não encontrados. Pulando a população de dados.");
-        const contentPanel = document.getElementById('tab-content-clientes');
-        if (contentPanel) {
-            contentPanel.innerHTML = `<div class="text-center p-8 bg-red-50 text-red-700 rounded-lg">
-                <p class="font-bold">Erro ao carregar o painel.</p>
-                <p>Não foi possível encontrar os elementos necessários para exibir a análise de clientes.</p>
-            </div>`;
-        }
-        return;
-    }
-
-    kpiTotal.textContent = '...';
-    kpiNovos.textContent = '...';
-    kpiRecorrentes.textContent = '...';
-    kpiRetencao.textContent = '...%';
-    topClientsTable.innerHTML = '<tr><td colspan="5" class="text-center p-4">Carregando dados...</td></tr>';
-
-    try {
-        const allClients = await fetchClients();
-
-        if (allClients.length === 0) {
-            kpiTotal.textContent = '0';
-            kpiNovos.textContent = '0';
-            kpiRecorrentes.textContent = '0';
-            kpiRetencao.textContent = '0%';
-            topClientsTable.innerHTML = '<tr><td colspan="5" class="text-center p-4">Nenhum cliente encontrado.</td></tr>';
-            return;
-        }
-
-        const totalClientes = allClients.length;
-
-        const now = new Date();
-        const startOfMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        const novosClientesMes = allClients.filter(c => c.firstOrderDate && c.firstOrderDate >= startOfMonthStr).length;
-
-        const clientesRecorrentes = allClients.filter(c => c.orderCount > 1).length;
-
-        const taxaRetencao = totalClientes > 0 ? ((clientesRecorrentes / totalClientes) * 100).toFixed(1) : 0;
-
-        kpiTotal.textContent = totalClientes;
-        kpiNovos.textContent = novosClientesMes;
-        kpiRecorrentes.textContent = clientesRecorrentes;
-        kpiRetencao.textContent = `${taxaRetencao}%`;
-
-        const topClients = allClients.sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 10);
-
-        topClientsTable.innerHTML = topClients.map((client, index) => `
-            <tr class="border-b hover:bg-gray-50">
-                <td class="py-2 px-3 font-bold text-gray-600">${index + 1}</td>
-                <td class="py-2 px-3 font-semibold">${client.name}</td>
-                <td class="py-2 px-3">${client.phone}</td>
-                <td class="py-2 px-3 text-right font-bold text-green-600">${formatCurrency(client.totalSpent)}</td>
-                <td class="py-2 px-3 text-center font-semibold">${client.orderCount}</td>
-            </tr>
-        `).join('');
-
-        const growthChartLabels = [];
-        const newClientsData = new Array(6).fill(0);
-
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            growthChartLabels.push(new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(d).replace('.', ''));
-            const year = d.getFullYear();
-            const month = d.getMonth();
-
-            const clientsInMonth = allClients.filter(client => {
-                if (!client.firstOrderDate) return false;
-                const firstOrderDate = new Date(client.firstOrderDate + 'T00:00:00');
-                return firstOrderDate.getFullYear() === year && firstOrderDate.getMonth() === month;
-            });
-            newClientsData[5 - i] = clientsInMonth.length;
-        }
-
-        createClientGrowthChart('client-growth-chart', { labels: growthChartLabels, data: newClientsData });
-
-        const segmentation = {
-            'Ouro': { count: 0, color: '#FBBF24' },
-            'Prata': { count: 0, color: '#94A3B8' },
-            'Bronze': { count: 0, color: '#FB923C' },
-            'Devedor': { count: 0, color: '#EAB308' },
-            'Péssimo': { count: 0, color: '#B91C1C' }
-        };
-
-        allClients.forEach(client => {
-            const rank = calculateClientRank(client);
-            if (segmentation[rank.text]) {
-                segmentation[rank.text].count++;
-            }
-        });
-
-        const segmentationLabels = Object.keys(segmentation).filter(key => segmentation[key].count > 0);
-        const segmentationData = segmentationLabels.map(key => segmentation[key].count);
-        const segmentationColors = segmentationLabels.map(key => segmentation[key].color);
-
-        createClientSegmentationChart('client-segmentation-chart', {
-            labels: segmentationLabels,
-            data: segmentationData,
-            colors: segmentationColors
-        });
-
-    } catch (error) {
-        console.error("Erro ao popular dados de análise de clientes:", error);
-        topClientsTable.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-red-500">Erro ao carregar dados dos clientes.</td></tr>';
-    }
-}
+// populateCustomerAnalysisData function moved to manager-shared.js to avoid circular imports
 
 export function createExpiredOrderAlertHTML(order) {
     const debito = formatCurrency(order.restante || 0);
