@@ -3,7 +3,7 @@
 import { collection, query, onSnapshot, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { db } from './firebase-config.js';
 import { formatCurrency, formatDateToBR, showToast, getProductInfoById, getSalgadosCountFromItems, getTodayDateString } from './utils.js';
-import { showOrderDetailModal, populateCustomerAnalysisData } from './manager.js';
+import { showOrderDetailModal, populateCustomerAnalysisData } from './manager-shared.js';
 // A correção está na linha abaixo, removendo a função 'listenToOrders'.
 import { _standardizeOrderData, fetchSalesDataForDashboard, checkForDailyDeliveries, fetchTeamActivityOrders } from './firebaseService.js';
 import { productsConfig } from './app.js';
@@ -139,24 +139,6 @@ function createDashboardHTML() {
             <div id="content-visao-geral" class="dashboard-tab-content">
                 <div class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-<<<<<<< HEAD
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-hand-holding-usd text-3xl text-green-500 bg-green-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Vendido Hoje</p><p id="vg-vendido-hoje" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-hourglass-half text-3xl text-orange-500 bg-orange-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">A Receber Hoje</p><p id="vg-areceber-hoje" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-shopping-basket text-3xl text-blue-500 bg-blue-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Pedidos Hoje</p><p id="vg-pedidos-hoje" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-file-invoice-dollar text-3xl text-purple-500 bg-purple-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Ticket Médio Hoje</p><p id="vg-ticket-medio-hoje" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-truck text-3xl text-cyan-500 bg-cyan-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Entregas para Hoje</p><p id="vg-entregas-hoje" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-check-double text-3xl text-green-500 bg-green-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Entregas Pagas</p><p id="vg-entregas-pagas" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-exclamation-triangle text-3xl text-red-500 bg-red-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Pendentes de Pag.</p><p id="vg-entregas-pendentes" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                    </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="surface-card p-6 rounded-xl shadow-lg h-[400px]">
-                            <h3 class="text-xl font-bold mb-4">Vendas nos Últimos 7 Dias</h3>
-                            <div id="vg-chart-container" class="relative h-full max-h-[320px]"><canvas id="visao-geral-semanal-chart"></canvas></div>
-                        </div>
-                        <div class="surface-card p-6 rounded-xl shadow-lg h-[400px] flex flex-col">
-=======
                         <div class="bg-white p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-hand-holding-usd text-3xl text-green-500 bg-green-100 p-4 rounded-full"></i><div><p class="text-sm text-gray-500">Vendido Hoje</p><p id="vg-vendido-hoje" class="text-2xl font-bold">Carregando...</p></div></div>
                         <div class="bg-white p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-hourglass-half text-3xl text-orange-500 bg-orange-100 p-4 rounded-full"></i><div><p class="text-sm text-gray-500">A Receber Hoje</p><p id="vg-areceber-hoje" class="text-2xl font-bold">Carregando...</p></div></div>
                         <div class="bg-white p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-shopping-basket text-3xl text-blue-500 bg-blue-100 p-4 rounded-full"></i><div><p class="text-sm text-gray-500">Pedidos Hoje</p><p id="vg-pedidos-hoje" class="text-2xl font-bold">Carregando...</p></div></div>
@@ -173,7 +155,6 @@ function createDashboardHTML() {
                             <div id="vg-chart-container" class="relative h-full max-h-[320px]"><canvas id="visao-geral-semanal-chart"></canvas></div>
                         </div>
                         <div class="bg-white p-6 rounded-xl shadow-lg h-[400px] flex flex-col">
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                             <h3 class="text-xl font-bold mb-4">Agenda do Dia</h3>
                             <div id="vg-agenda-hoje" class="flex-grow overflow-y-auto space-y-2 pr-2"><p class="text-center text-gray-500 italic mt-8">Carregando agenda...</p></div>
                         </div>
@@ -196,28 +177,6 @@ function createDashboardHTML() {
 function createFinancialAnalysisDashboardHTML() {
     return `
         <div class="space-y-6">
-<<<<<<< HEAD
-            <div class="surface-card p-4 rounded-xl shadow-lg flex items-center gap-4 flex-wrap">
-                <label for="gerencial-start-date" class="font-semibold">De:</label>
-                <input type="date" id="gerencial-start-date" class="input-themed p-2 rounded-lg">
-                <label for="gerencial-end-date" class="font-semibold">Até:</label>
-                <input type="date" id="gerencial-end-date" class="input-themed p-2 rounded-lg">
-                <button id="gerencial-apply-filter" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold ml-auto">Aplicar Filtro</button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-dollar-sign text-3xl text-green-500 bg-green-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Faturamento Total</p><p id="gerencial-dash-total-revenue" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-receipt text-3xl text-blue-500 bg-blue-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Ticket Médio</p><p id="gerencial-dash-average-ticket" class="text-2xl font-bold text-color-primary">Carregando...</p></div></div>
-                <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-crown text-3xl text-yellow-500 bg-yellow-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Top Cliente</p><p id="gerencial-dash-top-customer-name" class="text-lg font-bold truncate text-color-primary" title="Carregando...">Carregando...</p><p id="gerencial-dash-top-customer-value" class="text-sm text-color-secondary">--</p></div></div>
-                <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><i class="fas fa-chart-line text-3xl text-red-500 bg-red-100 p-4 rounded-full"></i><div><p class="text-sm text-color-secondary">Pico de Vendas</p><p id="gerencial-dash-sales-peak-date" class="text-lg font-bold text-color-primary">Carregando...</p><p id="gerencial-dash-sales-peak-value" class="text-sm text-color-secondary">--</p></div></div>
-            </div>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1 surface-card p-6 rounded-xl shadow-lg"><h3 class="text-xl font-bold mb-4">Faturamento por Categoria</h3><div class="h-80 relative"><canvas id="gerencial-dash-category-chart"></canvas></div></div>
-                <div class="lg:col-span-2 surface-card p-6 rounded-xl shadow-lg flex flex-col"><h3 class="text-xl font-bold mb-4">Desempenho de Produtos</h3><div class="overflow-y-auto h-80 flex-grow"><table class="min-w-full text-sm"><thead class="table-header-themed sticky top-0"><tr><th class="py-2 px-3 text-left">Produto</th><th class="py-2 px-3 text-center">Qtd.</th><th class="py-2 px-3 text-right">Faturamento</th><th class="py-2 px-3 text-right">Lucro Bruto</th></tr></thead><tbody id="gerencial-dash-products-table-body"></tbody></table></div><div class="border-t mt-4 pt-4 flex justify-between font-bold text-lg"><span>Total de Pedidos: <span id="gerencial-dash-total-orders">--</span></span><span>Lucro Bruto Total: <span id="gerencial-dash-total-profit" class="text-green-600">--</span></span></div></div>
-            </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="text-xl font-bold mb-4">Quantidade Vendida por Categoria</h3><div class="h-80 relative"><canvas id="gerencial-dash-quantity-by-category-chart"></canvas></div></div>
-                <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="text-xl font-bold mb-4">Faturamento por Hora do Dia</h3><div class="h-80 relative"><canvas id="gerencial-dash-sales-by-hour-chart"></canvas></div></div>
-=======
             <div class="bg-white p-4 rounded-xl shadow-lg flex items-center gap-4 flex-wrap">
                 <label for="gerencial-start-date" class="font-semibold">De:</label>
                 <input type="date" id="gerencial-start-date" class="p-2 border rounded-lg bg-gray-50">
@@ -238,7 +197,6 @@ function createFinancialAnalysisDashboardHTML() {
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-xl shadow-lg"><h3 class="text-xl font-bold mb-4">Quantidade Vendida por Categoria</h3><div class="h-80 relative"><canvas id="gerencial-dash-quantity-by-category-chart"></canvas></div></div>
                 <div class="bg-white p-6 rounded-xl shadow-lg"><h3 class="text-xl font-bold mb-4">Faturamento por Hora do Dia</h3><div class="h-80 relative"><canvas id="gerencial-dash-sales-by-hour-chart"></canvas></div></div>
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
             </div>
             <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-xl shadow-lg text-white mt-6">
                 <div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold">Análise Inteligente (Gemini AI)</h2><i class="fas fa-brain text-3xl opacity-70"></i></div>
@@ -308,19 +266,6 @@ function createProductAnalysisDashboardHTML() {
 function createClientAnalysisDashboardHTML() {
     return `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-<<<<<<< HEAD
-            <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-blue-100 p-3 rounded-full"><i class="fas fa-users text-xl text-blue-600"></i></div><div><p class="text-sm text-color-secondary">Total de Clientes</p><p id="kpi-total-clientes" class="text-2xl font-bold text-color-primary">...</p></div></div>
-            <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-green-100 p-3 rounded-full"><i class="fas fa-user-plus text-xl text-green-600"></i></div><div><p class="text-sm text-color-secondary">Novos (Mês)</p><p id="kpi-novos-clientes" class="text-2xl font-bold text-color-primary">...</p></div></div>
-            <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-purple-100 p-3 rounded-full"><i class="fas fa-sync-alt text-xl text-purple-600"></i></div><div><p class="text-sm text-color-secondary">Clientes Recorrentes</p><p id="kpi-clientes-recorrentes" class="text-2xl font-bold text-color-primary">...</p></div></div>
-            <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-amber-100 p-3 rounded-full"><i class="fas fa-chart-line text-xl text-amber-600"></i></div><div><p class="text-sm text-color-secondary">Taxa de Retenção</p><p id="kpi-taxa-retencao" class="text-2xl font-bold text-color-primary">...%</p></div></div>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 surface-card p-6 rounded-xl shadow-lg">
-                <h3 class="font-bold text-lg mb-4">Top 10 Clientes (por valor gasto)</h3>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="table-header-themed"><tr class="text-left"><th class="p-2">#</th><th class="p-2">Nome</th><th class="p-2">Telefone</th><th class="p-2 text-right">Total Gasto</th><th class="p-2 text-center">Pedidos</th></tr></thead>
-=======
             <div class="bg-white p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-blue-100 p-3 rounded-full"><i class="fas fa-users text-xl text-blue-600"></i></div><div><p class="text-sm text-gray-500">Total de Clientes</p><p id="kpi-total-clientes" class="text-2xl font-bold">...</p></div></div>
             <div class="bg-white p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-green-100 p-3 rounded-full"><i class="fas fa-user-plus text-xl text-green-600"></i></div><div><p class="text-sm text-gray-500">Novos (Mês)</p><p id="kpi-novos-clientes" class="text-2xl font-bold">...</p></div></div>
             <div class="bg-white p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-purple-100 p-3 rounded-full"><i class="fas fa-sync-alt text-xl text-purple-600"></i></div><div><p class="text-sm text-gray-500">Clientes Recorrentes</p><p id="kpi-clientes-recorrentes" class="text-2xl font-bold">...</p></div></div>
@@ -332,19 +277,13 @@ function createClientAnalysisDashboardHTML() {
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead class="bg-gray-50"><tr class="text-left"><th class="p-2">#</th><th class="p-2">Nome</th><th class="p-2">Telefone</th><th class="p-2 text-right">Total Gasto</th><th class="p-2 text-center">Pedidos</th></tr></thead>
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                         <tbody id="top-clients-table-body"></tbody>
                     </table>
                 </div>
             </div>
             <div class="space-y-8">
-<<<<<<< HEAD
-                <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Crescimento de Novos Clientes (6 Meses)</h3><div><canvas id="client-growth-chart"></canvas></div></div>
-                <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Segmentação de Clientes</h3><div><canvas id="client-segmentation-chart"></canvas></div></div>
-=======
                 <div class="bg-white p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Crescimento de Novos Clientes (6 Meses)</h3><div><canvas id="client-growth-chart"></canvas></div></div>
                 <div class="bg-white p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Segmentação de Clientes</h3><div><canvas id="client-segmentation-chart"></canvas></div></div>
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
             </div>
         </div>
     `;
@@ -359,22 +298,14 @@ function populateProductsTable(products) {
     const trackedProducts = products.filter(p => p.id && !p.id.startsWith('manual_'));
 
     if (trackedProducts.length === 0) {
-<<<<<<< HEAD
-        tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-color-secondary">Nenhum produto vendido no período.</td></tr>`;
-=======
         tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-500">Nenhum produto vendido no período.</td></tr>`;
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
         return;
     }
 
     const sortedProducts = [...trackedProducts].sort((a, b) => b.revenue - a.revenue);
 
     tableBody.innerHTML = sortedProducts.map(p => `
-<<<<<<< HEAD
-        <tr class="border-b border-themed surface-hover">
-=======
         <tr class="border-b hover:bg-gray-50">
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
             <td class="py-2 px-3">${p.name}</td>
             <td class="py-2 px-3 text-center">${p.quantity}</td>
             <td class="py-2 px-3 text-right">${formatCurrency(p.revenue)}</td>
@@ -585,15 +516,9 @@ async function loadVisaoGeralData() {
                 const totalSalgados = getSalgadosCountFromItems(order.items);
 
                 return `
-<<<<<<< HEAD
-                    <div class="flex items-center gap-4 p-3 rounded-lg border border-themed ${timePassed ? 'surface-alt opacity-70' : 'surface-card'}">
-                        <div class="text-center w-16 shrink-0"><p class="font-bold text-lg">${order.delivery?.time || 'N/A'}</p><span class="text-xs px-2 py-0.5 rounded-full font-semibold ${deliveryStatusClass}">${deliveryStatusText}</span></div>
-                        <div class="flex-grow"><p class="font-semibold truncate">${order.customer?.name || 'N/A'}</p><p class="text-sm text-color-secondary">Pedido #${order.orderNumber}</p></div>
-=======
                     <div class="flex items-center gap-4 p-3 rounded-lg border ${timePassed ? 'bg-gray-50 opacity-70' : 'bg-white'}">
                         <div class="text-center w-16 shrink-0"><p class="font-bold text-lg">${order.delivery?.time || 'N/A'}</p><span class="text-xs px-2 py-0.5 rounded-full font-semibold ${deliveryStatusClass}">${deliveryStatusText}</span></div>
                         <div class="flex-grow"><p class="font-semibold truncate">${order.customer?.name || 'N/A'}</p><p class="text-sm text-gray-500">Pedido #${order.orderNumber}</p></div>
->>>>>>> dcc2a74b0e383387cb504984af1f030268ff6044
                         <div class="text-center shrink-0"><p class="font-bold text-orange-500">${totalSalgados}</p><p class="text-xs text-gray-500">Salgados</p></div>
                         <div class="text-center w-20 shrink-0"><p class="font-bold ${paymentStatusClass}">${formatCurrency(order.restante)}</p><p class="text-xs text-gray-500">em Aberto</p></div>
                     </div>
