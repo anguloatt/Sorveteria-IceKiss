@@ -1353,7 +1353,7 @@ function switchStockTab(tabId) {
         dom.manager.tabStockHistory.classList.remove('text-gray-500', 'border-transparent');
         dom.manager.tabStockHistory.classList.add('text-blue-600', 'border-blue-500');
         dom.manager.contentStockHistory.classList.remove('hidden');
-        loadStockHistoryView();
+        initStockHistoryView();
     }
 }
 
@@ -1393,7 +1393,7 @@ async function loadStockManagementView() {
 }
 
 // Carrega os dados para a view de histórico de estoque
-async function loadStockHistoryView() {
+async function initStockHistoryView() {
     console.log("loadStockHistoryView: Carregando view de histórico de estoque.");
     const { stockHistoryFilter, stockHistoryTableBody } = dom.manager;
 
