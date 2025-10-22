@@ -1,0 +1,5 @@
+# Ignorar backups e arquivos grandes
+backups/
+*.pdf
+*.txt
+*.xlsx
