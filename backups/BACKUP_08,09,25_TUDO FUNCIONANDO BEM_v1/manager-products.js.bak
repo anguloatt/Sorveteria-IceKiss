@@ -1,0 +1,339 @@
+import { writeBatch, doc, getDoc, collection as firestoreCollection } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+import { db } from './firebase-config.js';
+import { parseCurrency, formatCurrency, showToast } from './utils.js';
+import { productsConfig, categoryConfig, setCategoryConfig, currentUser } from './app.js';
+import { serverTimestamp, logActivity } from './firebaseService.js';
+
+import { renderProducts as pdvRenderProducts } from './pdv.js';
+
+// Salva o cardápio (produtos) no Firestore
+export async function saveManagerConfig() {
+    console.log("saveManagerConfig: Iniciando salvamento do cardápio.");
+    const saveBtn = document.querySelector('#manager-save-overload-btn') || document.querySelector('[data-save-products]') || document.getElementById('manager-save-overload-btn');
+    // Fallback para o botão real vindo de domRefs quando chamado pelo manager.js
+    const actualSaveBtn = document.querySelector && document.querySelector('#manager-save-overload-btn') ? document.querySelector('#manager-save-overload-btn') : (saveBtn || null);
+    const btn = document.getElementById('manager-save-overload-btn') || document.querySelector('.save-products-btn') || document.getElementById('manager-save-products-btn');
+    // Use dom lookup inside manager.js; caller garante que existe
+    const saveButton = document.getElementById('manager-save-products-btn') || document.getElementById('manager-save-overload-btn') || document.querySelector('.save-products-btn');
+
+    const targetSaveBtn = saveButton || (typeof window !== 'undefined' ? document.querySelector('#manager-save-overload-btn') : null);
+    if (!targetSaveBtn) {
+        console.warn('saveManagerConfig: botão de salvar não encontrado no DOM; operação cancelada.');
+        return;
+    }
+
+    targetSaveBtn.disabled = true;
+    targetSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Salvando...';
+
+    const batch = writeBatch(db);
+    const productRows = document.querySelectorAll('#manager-products-list .product-config-row-wrapper');
+    const activeTab = document.querySelector('.manager-cardapio-tab.active-tab-manager');
+    const activeCategory = activeTab ? activeTab.dataset.category : null;
+
+    if (!activeCategory) {
+        showToast("Erro: Categoria ativa não encontrada.", "error");
+        targetSaveBtn.disabled = false;
+        targetSaveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Salvar Todas as Alterações';
+        return;
+    }
+
+    const newItemsForOldSystem = [];
+
+    const promises = Array.from(productRows).map(async (row) => {
+        const id = row.dataset.productId;
+        const isActive = row.dataset.active === 'true';
+        const name = row.querySelector('[data-field="name"]').value.trim();
+        const position = parseInt(row.querySelector('[data-field="position"]').value, 10);
+        const priceString = row.querySelector('[data-field="price-unico"]')?.value || '';
+        const costString = row.querySelector('[data-field="cost"]')?.value || '';
+        const costPercentString = row.querySelector('[data-field="cost-percent"]')?.value;
+        const price = parseCurrency(priceString);
+        let cost = parseCurrency(costString);
+        const costPercent = (typeof costPercentString !== 'undefined' && costPercentString !== null && costPercentString !== '') ? Number(String(costPercentString).replace(',', '.')) : null;
+        if ((isNaN(cost) || cost === 0) && !isNaN(costPercent) && !isNaN(price) && price > 0) {
+            cost = +(price * (costPercent / 100));
+        }
+        const stock = parseInt(row.querySelector('[data-field="stock"]').value, 10);
+        const category = row.dataset.category;
+
+        if (!name || isNaN(price) || isNaN(cost)) {
+            console.warn(`Linha de produto inválida (nome, preço ou custo) ignorada: ID ${id}. Pulando.`);
+            return;
+        }
+
+        newItemsForOldSystem.push({
+            id,
+            name,
+            price,
+            cost,
+            costPercent: isNaN(costPercent) ? null : costPercent,
+            category,
+            position: isNaN(position) ? null : position,
+            isActive
+        });
+
+        const productRef = doc(db, "products", id);
+        const productSnap = await getDoc(productRef);
+
+        const productData = {
+            name,
+            price,
+            cost,
+            costPercent: isNaN(costPercent) ? null : costPercent,
+            position: isNaN(position) ? null : position,
+            stock: isNaN(stock) ? 0 : stock,
+            category,
+            isActive
+        };
+
+        if (productSnap.exists()) {
+            const oldData = productSnap.data();
+            const hasPriceChanged = oldData.price !== price;
+            const hasCostChanged = (oldData.cost || 0) !== cost;
+            if (hasPriceChanged || hasCostChanged) {
+                const historyRef = doc(firestoreCollection(db, `products/${id}/priceHistory`));
+                const historyData = {
+                    newPrice: price,
+                    oldPrice: oldData.price ?? null,
+                    newCost: cost,
+                    oldCost: oldData.cost ?? null,
+                    newCostPercent: isNaN(costPercent) ? null : costPercent,
+                    oldCostPercent: oldData.costPercent ?? null,
+                    timestamp: serverTimestamp(),
+                    changedBy: currentUser.name
+                };
+                batch.set(historyRef, historyData);
+            }
+            batch.update(productRef, productData);
+        } else {
+            batch.set(productRef, { ...productData, createdAt: serverTimestamp() });
+            const historyRef = doc(firestoreCollection(db, `products/${id}/priceHistory`));
+            const historyData = {
+                newPrice: price,
+                oldPrice: null,
+                newCost: cost,
+                oldCost: null,
+                newCostPercent: isNaN(costPercent) ? null : costPercent,
+                oldCostPercent: null,
+                timestamp: serverTimestamp(),
+                changedBy: currentUser.name,
+                reason: 'Criação do Produto'
+            };
+            batch.set(historyRef, historyData);
+        }
+    });
+
+    try {
+        await Promise.all(promises);
+        const configDocRef = doc(db, "config", "main");
+        const configSnap = await getDoc(configDocRef);
+        if (configSnap.exists()) {
+            const configData = configSnap.data();
+            const updatedProductsArray = Array.isArray(configData.products) ? [...configData.products] : [];
+            const categoryIndex = updatedProductsArray.findIndex(cat => cat.id === activeCategory);
+            if (categoryIndex > -1) {
+                updatedProductsArray[categoryIndex].items = newItemsForOldSystem;
+            } else {
+                updatedProductsArray.push({ id: activeCategory, items: newItemsForOldSystem });
+            }
+            batch.update(configDocRef, { products: updatedProductsArray });
+        }
+        await batch.commit();
+        await logActivity(currentUser.name, 'Salvou Cardápio', { categoria: activeCategory });
+        showToast("Cardápio salvo com sucesso!", "success");
+        const { loadConfig } = await import('./app.js');
+        await loadConfig();
+        renderManagerCardapioTabs();
+        switchManagerCardapioTab(activeCategory);
+    } catch (error) {
+        console.error("saveManagerConfig: Erro ao salvar cardápio em lote:", error);
+        showToast("Falha ao salvar o cardápio. Verifique o console.", "error");
+    } finally {
+        targetSaveBtn.disabled = false;
+        targetSaveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Salvar Todas as Alterações';
+    }
+}
+
+export function openCategoryManager() {
+    const modal = document.getElementById('category-manager-modal');
+    const list = document.getElementById('category-list-manager');
+    if (!modal || !list) return;
+    list.innerHTML = '';
+    const addBtnContainer = document.getElementById('category-manager-add-btn-container');
+    if (addBtnContainer) addBtnContainer.remove();
+    const addContainer = document.createElement('div');
+    addContainer.id = 'category-manager-add-btn-container';
+    addContainer.className = 'mb-4 flex justify-end';
+    addContainer.innerHTML = `<button id="category-manager-add-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Adicionar Categoria</button>`;
+    modal.querySelector('.surface-card')?.prepend(addContainer);
+    setTimeout(() => {
+        const addBtn = document.getElementById('category-manager-add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                let newIdBase = 'custom_' + Date.now();
+                let newId = newIdBase;
+                let i = 1;
+                while (categoryConfig.find(c => c.id === newId)) {
+                    newId = `${newIdBase}_${i++}`;
+                }
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-3 p-3 surface-alt rounded-lg shadow-sm cursor-grab';
+                li.draggable = true;
+                li.dataset.categoryId = newId;
+                li.innerHTML = `
+                    <i class="fas fa-grip-vertical text-gray-400"></i>
+                    <input type="text" value="Nova Categoria" class="input-themed flex-grow p-2 rounded-md" placeholder="Nome da Categoria">
+                    <label class="flex items-center cursor-pointer">
+                        <span class="mr-2 text-sm font-medium text-color-secondary">Visível</span>
+                        <div class="relative">
+                            <input type="checkbox" class="sr-only category-visibility-toggle" checked>
+                            <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                        </div>
+                    </label>
+                    <button class="ml-2 bg-red-500 text-white px-3 py-1 rounded remove-category-btn" title="Remover Categoria">Remover</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+    }, 0);
+    categoryConfig.forEach(cat => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-3 p-3 surface-alt rounded-lg shadow-sm cursor-grab';
+        li.draggable = true;
+        li.dataset.categoryId = cat.id;
+        li.innerHTML = `
+            <i class="fas fa-grip-vertical text-gray-400"></i>
+            <input type="text" value="${cat.name}" class="input-themed flex-grow p-2 rounded-md" placeholder="Nome da Categoria">
+            <label class="flex items-center cursor-pointer">
+                <span class="mr-2 text-sm font-medium text-color-secondary">Visível</span>
+                <div class="relative">
+                    <input type="checkbox" class="sr-only category-visibility-toggle" ${cat.visible ? 'checked' : ''}>
+                    <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                </div>
+            </label>
+            <button class="ml-2 bg-red-500 text-white px-3 py-1 rounded remove-category-btn" title="Remover Categoria">Remover</button>
+        `;
+        list.appendChild(li);
+    });
+    // Drag & drop and event listeners
+    list.addEventListener('dragstart', e => { window._draggedItem = e.target.closest('li'); setTimeout(() => { if (window._draggedItem) window._draggedItem.classList.add('opacity-50'); }, 0); });
+    list.addEventListener('dragend', () => { if (window._draggedItem) window._draggedItem.classList.remove('opacity-50'); window._draggedItem = null; });
+    list.addEventListener('dragover', e => { e.preventDefault(); const afterElement = getDragAfterElement(list, e.clientY); if (window._draggedItem) { if (afterElement == null) list.appendChild(window._draggedItem); else list.insertBefore(window._draggedItem, afterElement); } });
+    list.addEventListener('click', (e) => { const removeBtn = e.target.closest('.remove-category-btn'); if (removeBtn) { const li = removeBtn.closest('li'); if (!li) return; const catId = li.dataset.categoryId; const confirmed = confirm('Remover esta categoria? Isto não removerá produtos do banco de dados, apenas ocultará a categoria da interface.'); if (confirmed) li.remove(); } });
+    modal.classList.add('active');
+}
+
+export function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('li:not(.opacity-50)')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+export async function saveCategoryConfig() {
+    const list = document.getElementById('category-list-manager');
+    const newConfig = [];
+    list.querySelectorAll('li').forEach((li, index) => {
+        const id = li.dataset.categoryId;
+        const nameInput = li.querySelector('input[type="text"]');
+        const visibleInput = li.querySelector('.category-visibility-toggle');
+        if (id && nameInput && visibleInput) {
+            const name = nameInput.value.trim();
+            const visible = visibleInput.checked;
+            if (name) newConfig.push({ id, name, order: index, visible });
+        }
+    });
+    setCategoryConfig(newConfig);
+    try { categoryConfig.sort((a, b) => (a.order || 0) - (b.order || 0)); } catch (e) { console.warn('Erro ao ordenar categoryConfig:', e); }
+    renderManagerCardapioTabs();
+    const firstVisibleCategory = categoryConfig.find(c => c.visible);
+    if (firstVisibleCategory) switchManagerCardapioTab(firstVisibleCategory.id); else document.getElementById('manager-products-list').innerHTML = '<div class="text-center p-8 text-gray-500">Nenhuma categoria visível. Gerencie as categorias para exibir produtos.</div>';
+    document.getElementById('category-manager-modal').classList.remove('active');
+    showToast("Configuração de categorias salva com sucesso!", "success");
+    try { const pdv = await import('./pdv.js'); if (pdv && typeof pdv.renderProducts === 'function') pdv.renderProducts(); } catch (e) { console.warn('Não foi possível atualizar o PDV automaticamente:', e); }
+}
+
+export function loadManagerCardapio(category) {
+    console.log("loadManagerCardapio: Carregando cardápio para categoria:", category);
+    if (!document.getElementById('manager-products-list')) { console.error("Elemento dom.manager.managerProductsList não encontrado."); return; }
+    const listEl = document.getElementById('manager-products-list');
+    listEl.innerHTML = `...`; // header markup maintained in original file
+    const productsToRender = productsConfig[category] || [];
+    if (productsToRender.length === 0) {
+        listEl.innerHTML += `<div class="text-center p-8 text-gray-500">Nenhum produto nesta categoria. Clique em "Adicionar Produto" para começar.</div>`;
+    } else {
+        productsToRender.forEach(p => { listEl.appendChild(createProductConfigRow(p, category)); });
+    }
+    console.log("loadManagerCardapio: Cardápio renderizado para categoria:", category);
+}
+
+export function createProductConfigRow(product, category) {
+    const row = document.createElement('div');
+    row.className = `product-config-row-wrapper`;
+    const productId = product.id || "prod_" + Date.now();
+    row.dataset.productId = productId;
+    row.dataset.category = category;
+    const isActive = product.isActive !== false;
+    row.dataset.active = isActive;
+    let stockClass = '';
+    if (typeof product.stock === 'number') {
+        if (product.stock <= 0) stockClass = 'bg-red-100 border-l-4 border-red-400';
+        else if (product.stock > 0 && product.stock <= 5) stockClass = 'bg-yellow-100 border-l-4 border-yellow-400';
+    }
+    const priceValue = Number(product.price) || 0;
+    const costValue = Number(product.cost) || 0;
+    const priceStringForInput = priceValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
+    const costStringForInput = costValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
+    const stockValue = typeof product.stock === 'number' ? product.stock : '';
+    const inactiveClass = !isActive ? 'product-inactive opacity-60' : '';
+    row.innerHTML = `...`;
+    try {
+        const priceInput = row.querySelector('[data-field="price-unico"]');
+        const percentInput = row.querySelector('[data-field="cost-percent"]');
+        const costInput = row.querySelector('[data-field="cost"]');
+        const defaultPercent = 60;
+        const parsePercent = (v) => { const n = Number(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
+        const updateCostFromPercent = () => { const price = parseCurrency(priceInput.value || '0'); const pct = parsePercent(percentInput.value); if (price > 0 && pct !== null) { const computed = +(price * (pct / 100)); costInput.value = computed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }); } };
+        const updatePercentFromCost = () => { const price = parseCurrency(priceInput.value || '0'); const cost = parseCurrency(costInput.value || '0'); if (price > 0) { const pct = (cost / price) * 100; percentInput.value = isFinite(pct) ? Math.round(pct) : defaultPercent; } };
+        if (priceInput) priceInput.addEventListener('input', () => updateCostFromPercent());
+        if (percentInput) percentInput.addEventListener('input', () => updateCostFromPercent());
+        if (costInput) costInput.addEventListener('input', () => updatePercentFromCost());
+    } catch (e) { console.warn('Não foi possível vincular eventos de custo/porcentagem na linha do produto:', e); }
+    return row;
+}
+
+export function renderManagerCardapioTabs() {
+    const container = document.getElementById('manager-cardapio-tab-container');
+    if (!container) { console.error("Container de abas do cardápio do gerente não encontrado."); return; }
+    container.innerHTML = '';
+    const orderedCategories = Array.isArray(categoryConfig) ? [...categoryConfig].sort((a, b) => (a.order || 0) - (b.order || 0)) : [];
+    const categoryColors = { assados: 'bg-lime-600 hover:bg-lime-700', fritos: 'bg-orange-500 hover:bg-orange-600', revenda: 'bg-teal-500 hover:bg-teal-600', outros: 'bg-slate-700 hover:bg-slate-800' };
+    orderedCategories.filter(c => c.visible).forEach(cat => {
+        const colorClass = categoryColors[cat.id] || 'bg-gray-500 hover:bg-gray-600';
+        const button = document.createElement('button');
+        button.className = `manager-cardapio-tab text-white ${colorClass}`;
+        button.dataset.category = cat.id;
+        button.textContent = cat.name;
+        button.addEventListener('click', () => switchManagerCardapioTab(cat.id));
+        container.appendChild(button);
+    });
+}
+
+export function switchManagerCardapioTab(category) {
+    console.log("switchManagerCardapioTab: Alternando para categoria do cardápio:", category);
+    const container = document.getElementById('manager-cardapio-tab-container');
+    if (!container) return;
+    container.querySelectorAll('.manager-cardapio-tab').forEach(tab => tab.classList.remove('active-tab-manager'));
+    const activeTab = container.querySelector(`[data-category="${category}"]`);
+    if (activeTab) activeTab.classList.add('active-tab-manager');
+    loadManagerCardapio(category);
+}

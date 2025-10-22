@@ -1,0 +1,71 @@
+/*
+  Script de limpeza conservadora para arquivos .js em public/
+  - Faz backup .bak do arquivo original
+  - Remove blocos de comentário (exceto JSDoc que começam com /**)
+  - Remove linhas que são somente comentários de linha (//...) exceto se contiverem TODO/FIXME/URLs/flags de linter
+  - Aplica trim em espaços finais
+  - Colapsa múltiplas linhas vazias em no máximo uma linha vazia
+
+  Uso: node .\clean-js.js
+*/
+
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname);
+
+function processContent(content) {
+  // remove blocos de comentário que não são JSDoc
+  content = content.replace(/\/\*[\s\S]*?\*\//g, (m) => {
+    if (/^\s*\/\*\*/.test(m)) return m; // mantém JSDoc
+    if (/TODO|FIXME|https?:\/\//i.test(m)) return m;
+    return '\n';
+  });
+
+  // 2) remove linhas que são somente comentários // ... mas preserva TODO/FIXME/URL/@eslint/\/@ts-ignore
+  const lines = content.split(/\r?\n/);
+  const out = [];
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (/^\/\//.test(trimmed)) {
+      if (/TODO|FIXME|https?:\/\//i.test(trimmed) || /@eslint|@ts-ignore|eslint-disable/.test(trimmed)) {
+        out.push(line);
+      } else {
+      }
+    } else {
+      out.push(line.replace(/\s+$/g, ''));
+    }
+  }
+
+  let result = out.join('\n');
+  result = result.replace(/(\n\s*\n){2,}/g, '\n\n');
+
+  if (!result.endsWith('\n')) result += '\n';
+  return result;
+}
+
+function walk(dir) {
+  const files = fs.readdirSync(dir, { withFileTypes: true });
+  for (const f of files) {
+    const abs = path.join(dir, f.name);
+    if (f.isDirectory()) walk(abs);
+    else if (f.isFile() && abs.endsWith('.js')) {
+      try {
+        const original = fs.readFileSync(abs, 'utf8');
+        const processed = processContent(original);
+        if (processed !== original) {
+          fs.writeFileSync(abs + '.bak', original, 'utf8');
+          fs.writeFileSync(abs, processed, 'utf8');
+          console.log('CLEANED:', abs);
+        } else {
+          console.log('SKIPPED (no change):', abs);
+        }
+      } catch (e) {
+        console.error('ERROR processing', abs, e);
+      }
+    }
+  }
+}
+
+walk(root);
+console.log('Done');

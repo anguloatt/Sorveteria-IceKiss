@@ -1,0 +1,235 @@
+﻿import { dom } from './domRefs.js'; // Importa o objeto dom centralizado
+import { showToast, showCustomConfirm, formatNameToTitleCase, formatDateTimeToBR } from './utils.js';
+import { employees, productionSettings as globalProductionSettings, currentUser } from './app.js'; // Importo as variáveis globais, mas não o 'db'.
+import { db } from './firebase-config.js'; // CORREÇÃO: Importo o 'db' diretamente da fonte para quebrar a dependência circular.
+import { doc, setDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { fetchEmployees, addEmployee as firebaseAddEmployee, editEmployee as firebaseEditEmployee, deleteEmployee as firebaseDeleteEmployee, resetEmployeePassword as firebaseResetEmployeePassword, logActivity } from './firebaseService.js'; // Importa funções de serviço Firebase
+
+export async function loadEmployees() {
+    console.log("employeeManagement: Carregando funcionários...");
+    try {
+        const fetchedEmployees = await fetchEmployees();
+        employees.splice(0, employees.length, ...fetchedEmployees);
+        console.log("employeeManagement: Funcionários carregados e atualizados:", employees);
+    } catch (error) {
+        console.error("employeeManagement: Erro ao carregar funcionários:", error);
+        showToast("Erro ao carregar lista de funcionários.", "error");
+    }
+}
+
+export function populatePdvEmployeeSwitcher() {
+    console.log("populatePdvEmployeeSwitcher: Populando seletor de funcionários no PDV.");
+    if (!dom.employeeSwitcherSelect) {
+        console.error("populatePdvEmployeeSwitcher: Elemento dom.employeeSwitcherSelect não encontrado.");
+        return;
+    }
+    dom.employeeSwitcherSelect.innerHTML = ''; // Limpa o seletor
+    employees.forEach(employee => {
+        const option = document.createElement('option');
+        option.value = employee.name;
+        option.textContent = employee.name;
+        dom.employeeSwitcherSelect.appendChild(option);
+    });
+    console.log("populatePdvEmployeeSwitcher: Seletor de funcionários do PDV populado.");
+}
+
+export function populateLoginEmployeeSelect() {
+    console.log("populateLoginEmployeeSelect: Populando seletor de funcionários na tela de login.");
+    if (!dom.employeeUserSelect) {
+        console.error("populateLoginEmployeeSelect: Elemento dom.employeeUserSelect não encontrado.");
+        return;
+    }
+    dom.employeeUserSelect.innerHTML = '<option value="">-- Selecione seu nome --</option>';
+    employees.forEach(employee => {
+        const option = document.createElement('option');
+        option.value = employee.name;
+        option.textContent = employee.name;
+        dom.employeeUserSelect.appendChild(option);
+    });
+    console.log("populateLoginEmployeeSelect: Seletor de login de funcionário populado.");
+}
+
+export async function addEmployee(name, role) {
+    if (!name || name.trim() === '') {
+        showToast("O nome do funcionário não pode ser vazio.", "error");
+        return;
+    }
+    if (!role) {
+        showToast("Selecione um cargo para o funcionário.", "error");
+        return;
+    }
+    const formattedName = formatNameToTitleCase(name);
+    const confirmAdd = await showCustomConfirm("Adicionar Funcionário", `Adicionar "${formattedName}" com o cargo de "${role}"? A senha inicial será "1234".`);
+    if (!confirmAdd) return;
+
+try {
+        const newEmployee = await firebaseAddEmployee(formattedName, role);
+        if (newEmployee) {
+            await logActivity(currentUser.name, 'Adicionou Funcionário', { nome: formattedName, cargo: role });
+            await loadEmployees(); // Recarrego a lista de funcionários do banco.
+            renderEmployeesManagerTab(); // Atualizo a tabela no painel.
+            populatePdvEmployeeSwitcher(); // Atualizo o seletor do PDV.
+            if (dom.manager.newEmployeeNameInput) dom.manager.newEmployeeNameInput.value = '';
+        }
+    } catch (error) {
+        console.error("employeeManagement: Erro ao adicionar funcionário:", error);
+    }
+}
+
+export async function editEmployee(employeeId, newName, newRole) {
+    if (!newName || newName.trim() === '') {
+        showToast("O nome do funcionário não pode ser vazio.", "error");
+        return;
+    }
+    const formattedName = formatNameToTitleCase(newName);
+    const confirmEdit = await showCustomConfirm("Editar Funcionário", `Deseja alterar os dados do funcionário?`);
+    if (!confirmEdit) return;
+
+try {
+        await firebaseEditEmployee(employeeId, formattedName, newRole);
+        await logActivity(currentUser.name, 'Editou Funcionário', { id: employeeId, novoNome: formattedName, novoCargo: newRole });
+        await loadEmployees();
+        renderEmployeesManagerTab();
+        populatePdvEmployeeSwitcher();
+    } catch (error) {
+        console.error("employeeManagement: Erro ao editar funcionário:", error);
+    }
+}
+
+export async function resetEmployeePassword(employeeId, employeeName) {
+    const confirmReset = await showCustomConfirm("Resetar Senha", `Tem certeza que deseja resetar a senha de "${employeeName}" para "1234"?`);
+    if (!confirmReset) return;
+
+try {
+        await firebaseResetEmployeePassword(employeeId, employeeName);
+        await logActivity(currentUser.name, 'Redefiniu Senha de Funcionário', { nome: employeeName });
+    } catch (error) {
+        console.error("employeeManagement: Erro ao resetar senha:", error);
+    }
+}
+
+export async function deleteEmployee(employeeId, employeeName) {
+    const confirmDelete = await showCustomConfirm("Excluir Funcionário", `Tem certeza que deseja excluir o funcionário "${employeeName}"? Esta ação é irreversível.`);
+    if (!confirmDelete) return;
+
+try {
+        await firebaseDeleteEmployee(employeeId, employeeName);
+        await logActivity(currentUser.name, 'Removeu Funcionário', { nome: employeeName, id: employeeId });
+        await loadEmployees();
+        renderEmployeesManagerTab();
+        populatePdvEmployeeSwitcher();
+    } catch (error) {
+        console.error("employeeManagement: Erro ao excluir funcionário:", error);
+    }
+}
+
+export function renderEmployeesManagerTab(allOrders = []) {
+    console.log("renderEmployeesManagerTab: Carregando lista de funcionários para o painel de gerência.");
+    if (!dom.manager || !dom.manager.employeeListTableBody) {
+        console.error("renderEmployeesManagerTab: Elemento dom.manager.employeeListTableBody não encontrado.");
+        return;
+    }
+
+const lastActivityMap = new Map();
+    if (allOrders.length > 0) {
+        allOrders.forEach(order => {
+            const employeeName = order.createdBy?.name;
+            if (employeeName && order.createdAt instanceof Date) {
+                const orderDate = order.createdAt;
+                if (!lastActivityMap.has(employeeName) || orderDate > lastActivityMap.get(employeeName)) {
+                    lastActivityMap.set(employeeName, orderDate);
+                }
+            }
+        });
+    }
+    console.log("renderEmployeesManagerTab: Mapa de última atividade criado:", lastActivityMap);
+
+dom.manager.employeeListTableBody.innerHTML = '';
+    employees.forEach(employee => {
+        dom.manager.employeeListTableBody.appendChild(createEmployeeRow(employee, lastActivityMap));
+    });
+    if (employees.length === 0) {
+        const row = dom.manager.employeeListTableBody.insertRow();
+        row.innerHTML = `<td colspan="4" class="py-2 px-3 text-center text-gray-500">Nenhum funcionário cadastrado.</td>`;
+    }
+    console.log("renderEmployeesManagerTab: Lista de funcionários renderizada.");
+}
+
+function createEmployeeRow(employee, lastActivityMap) {
+    const row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+    row.dataset.employeeId = employee.id;
+    const roleMap = { 'caixa': 'Caixa', 'estoquista': 'Estoquista', 'gerente': 'Gerente' };
+    const roleText = roleMap[employee.role] || employee.role;
+
+const lastLoginDate = employee.lastLogin instanceof Date ? employee.lastLogin : null;
+    const lastOrderDate = lastActivityMap.get(employee.name);
+
+const mostRecentActivityDate = (lastLoginDate && lastOrderDate) ? (lastLoginDate > lastOrderDate ? lastLoginDate : lastOrderDate) : (lastLoginDate || lastOrderDate);
+    const lastActivityText = mostRecentActivityDate ? formatDateTimeToBR(mostRecentActivityDate) : 'Nunca';
+
+const isMestra = currentUser.role === 'mestra';
+    const isGerente = currentUser.role === 'gerente';
+
+const canEdit = isMestra || (isGerente && (employee.role !== 'gerente' || employee.id === currentUser.id));
+
+const editBtnHtml = canEdit ? `
+        <button class="text-blue-500 hover:text-blue-700 edit-employee-btn" data-employee-id="${employee.id}" data-employee-name="${employee.name}" data-employee-role="${employee.role}" title="Editar Funcionário">
+            <i class="fas fa-edit"></i>
+        </button>` : '';
+
+const canReset = isMestra || (isGerente && (employee.role !== 'gerente' || employee.id === currentUser.id));
+    const resetBtnHtml = canReset ? `
+        <button class="text-blue-600 hover:text-blue-800 p-2 reset-password-btn" data-employee-id="${employee.id}" data-employee-name="${employee.name}" title="Redefinir Senha para '1234'">
+            <i class="fas fa-key"></i>
+        </button>` : '';
+
+const canDelete = isMestra || (isGerente && employee.role !== 'mestra' && employee.id !== currentUser.id);
+    const deleteBtnHtml = canDelete ? `
+        <button class="text-red-500 hover:text-red-700 delete-employee-btn" data-employee-id="${employee.id}" data-employee-name="${employee.name}" title="Excluir Funcionário">
+            <i class="fas fa-trash"></i>
+        </button>` : '';
+
+row.innerHTML = `
+        <td class="py-2 px-3 font-semibold">${employee.name}</td>
+        <td class="py-2 px-3">${roleText}</td>
+        <td class="py-2 px-3 text-xs text-gray-500">${lastActivityText}</td>
+        <td class="py-2 px-3 text-center space-x-4">
+            ${editBtnHtml}
+            ${resetBtnHtml}
+            ${deleteBtnHtml}
+        </td>
+    `;
+    return row;
+}
+
+export async function saveProductionSettings(limit, windowMinutes) {
+    console.log("saveProductionSettings: Salvando configurações de produção...", { limit, windowMinutes });
+    if (isNaN(limit) || isNaN(windowMinutes) || limit <= 0 || windowMinutes <= 0) {
+        showToast("Valores inválidos para limite ou janela de tempo.", "error");
+        return;
+    }
+
+const settings = {
+        limit: Number(limit),
+        windowMinutes: Number(windowMinutes)
+    };
+
+try {
+        const prodConfigRef = doc(db, "config", "producao");
+        await setDoc(prodConfigRef, settings);
+
+await logActivity(currentUser.name, 'Salvou Configurações de Produção', { limite: settings.limit, janela: settings.windowMinutes });
+
+if (globalProductionSettings) {
+            Object.assign(globalProductionSettings, settings);
+        }
+
+showToast("Configurações de produção salvas com sucesso!", "success");
+
+} catch (error) {
+        console.error("Erro ao salvar configurações de produção:", error);
+        showToast("Falha ao salvar configurações de produção.", "error");
+    }
+}
+

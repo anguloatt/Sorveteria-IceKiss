@@ -1,0 +1,5 @@
+ENVIAR BACKUP DO FIREBASE PARA EMAIL MANUALMENTE GMAIL
+C:\Users\angul\OneDrive\Área de Trabalho\IceKiss_App - 2>python automacao_nuvem.py
+
+cd PROGRAMAS\IceKiss_App_2
+python automacao_nuvem.py

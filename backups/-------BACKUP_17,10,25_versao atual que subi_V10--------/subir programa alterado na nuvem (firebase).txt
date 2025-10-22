@@ -1,0 +1,6 @@
+SUBIR NOVO CODIGO PARA FIREBASE (NUVEM) WEN ...... HTTPS://SORVETERIA-ICED-KISS.WEB.APP
+
+C:\Users\angul\OneDrive\Área de Trabalho\IceKiss_App - 2>firebase deploy --only hosting
+
+cd OneDrive\Área de Trabalho\IceKiss_App - 2
+firebase deploy --only hosting

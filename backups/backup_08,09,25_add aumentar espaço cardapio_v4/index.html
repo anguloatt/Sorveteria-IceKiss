@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8"> <!-- Define a codificação de caracteres como UTF-8 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Configura a viewport para responsividade -->
+    <title>Ice Kiss - Sistema de Pedidos</title> <!-- Título da página exibido na aba do navegador -->
+    
+    <!-- PWA e Ícones -->
+    <link rel="manifest" href="manifest.json"> <!-- Define o manifesto para PWA -->
+    <link rel="icon" href="images/favicon-32x32.png" type="image/png"> <!-- Ícone local para consistência e offline -->
+    <link rel="apple-touch-icon" href="images/android-chrome-192x192.png"> <!-- Ícone local para dispositivos Apple -->
+    <meta name="mobile-web-app-capable" content="yes"> <!-- Habilita o modo de aplicativo web para Android -->
+
+    <!-- PWA: Meta tags para iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes"> <!-- Habilita o modo de aplicativo web para iOS -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"> <!-- Estilo da barra de status para iOS -->
+    <meta name="apple-mobile-web-app-title" content="Ice Kiss PDV"> <!-- Título do aplicativo na tela inicial do iOS -->
+    <meta name="theme-color" content="#f59e0b"> <!-- Cor do tema para navegadores -->
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-11448289854"></script> <!-- Script assíncrono do Google Analytics -->
+    <script>
+      window.dataLayer = window.dataLayer || []; // Inicializa a camada de dados
+      function gtag(){dataLayer.push(arguments);} // Função para enviar dados ao Analytics
+      gtag('js', new Date()); // Envia a data atual
+
+      gtag('config', 'G-11448289854'); // Configura o ID de rastreamento
+    </script>
+
+    <!-- Estilos e Fontes -->
+    <!-- Use versão empacotada do Tailwind em produção. O CDN é conveniente em dev, mas não recomendado para produção. -->
+    <!-- Para gerar localmente: npm install && npm run build:css -> gera ./dist/tailwind.css -->
+    <!-- <script src="https://cdn.tailwindcss.com/3.4.4"></script> -->
+    <link rel="stylesheet" href="dist/tailwind.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"> <!-- Importa a fonte Poppins do Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"> <!-- Importa o Font Awesome para ícones -->
+    
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script> 
+    
+    <!-- Biblioteca date-fns -->
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/locale/pt-BR/cdn.min.js"></script> 
+    
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body class="invisible">
+    <!-- Tela de Autenticação (Login) -->
+    <div id="auth-screen" class="fixed inset-0 bg-gradient-to-br from-blue-300 to-purple-400 flex items-center justify-center z-50">
+        <div class="surface-card rounded-2xl shadow-2xl w-full max-w-md md:max-w-lg text-center mx-4 overflow-hidden">
+            <div class="p-8 flex flex-col items-center justify-center relative">
+                <img src="images/logo-icekiss.jpg" alt="Logo Ice Kiss" class="w-28 h-28 mb-4 rounded-full shadow-lg border-4 border-amber-500">
+                <h1 class="text-3xl font-bold mb-2 text-color-primary">Ice Kiss Delivery</h1>
+                <p class="text-sm text-color-secondary mb-6">Sistema de Pedidos e Gestão</p>
+            </div>
+            
+            <div class="flex w-full border-b border-themed">
+                <button id="tab-funcionario" class="flex-1 py-3 font-semibold login-tab active-tab-login">Funcionário</button>
+                <button id="tab-gerencia" class="flex-1 py-3 font-semibold login-tab">Gerência</button>
+            </div>
+
+            <div class="p-8">
+                <div id="login-funcionario">
+                    <h2 class="text-2xl font-bold mb-4 text-color-primary">Acesso do Funcionário</h2>
+                    <form id="login-funcionario-form" onsubmit="return false">
+                        <!-- hidden username for accessibility/autocomplete -->
+                        <input type="text" autocomplete="username" id="employee-user-hidden" class="sr-only" aria-hidden="true">
+                        <select id="employee-user-select" class="input-themed w-full px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg transition-all duration-200 appearance-none" autocomplete="username">
+                        <option value="">-- Selecione seu nome --</option>
+                    </select>
+                        <input type="password" id="employee-pass" placeholder="Sua Senha" class="input-themed w-full px-4 py-3 rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg transition-all duration-200" autocomplete="current-password">
+                        <button id="login-btn-funcionario" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105">Entrar no PDV</button>
+                        <p class="text-center mt-4">
+                            <a href="#" id="forgot-password-link" class="text-sm text-blue-600 hover:underline">Esqueci minha senha</a>
+                        </p>
+                    </form>
+                </div>
+
+                <div id="login-gerencia" class="hidden">
+                    <h2 class="text-2xl font-bold mb-4 text-color-primary">Acesso Gerencial</h2>
+                    <form id="login-gerencia-form" onsubmit="return false">
+                        <!-- hidden username field for password form accessibility -->
+                        <input type="text" autocomplete="username" id="manager-user-hidden" class="sr-only" aria-hidden="true">
+                        <input type="text" id="manager-user" placeholder="Usuário" class="input-themed w-full px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg transition-all duration-200" autocomplete="username">
+                        <input type="password" id="manager-pass" placeholder="Senha" class="input-themed w-full px-4 py-3 rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg transition-all duration-200" autocomplete="current-password">
+                        <button id="login-btn-gerencia" class="w-full bg-orange-500 text-white py-3 rounded-lg font-semibold text-lg hover:bg-orange-600 transition-all duration-200 transform hover:scale-105">Entrar no Painel</button>
+                    </form>
+                </div>
+                <p class="text-xs text-color-secondary mt-8">V32.4 - Desenvolvido por "Arley"</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conteúdo do PDV do Funcionário -->
+    <div id="main-content" class="flex flex-col w-full h-full surface-background"> 
+        <header class="surface-card shadow-md p-4 flex justify-between items-center flex-wrap gap-4 no-print">
+            <div class="flex items-center gap-2 order-1">
+                <img src="images/logo-icekiss.jpg" alt="Logo Ice Kiss" class="w-16 h-16 rounded-full shadow-sm">
+                <button id="btn-anterior" class="header-nav-btn"><i class="fa fa-arrow-left"></i></button>
+                <input type="text" id="order-search-input" placeholder="Nº Pedido" class="input-themed w-24 text-center font-bold text-xl border-4 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow">
+                <button id="btn-proximo" class="header-nav-btn"><i class="fa fa-arrow-right"></i></button>
+                <button id="search-order-btn" class="header-nav-btn"><i class="fa fa-search"></i></button>
+                <span id="status-pedido-label" class="ml-2"></span>
+                <div id="status-display" class="status-label status-novo">Novo Pedido</div>
+            </div>
+
+            <div class="flex-2 flex justify-center order-2">
+                <h1 class="text-2xl font-bold text-color-primary hidden md:block">PEDIDO DELIVERY ICE KISS</h1>
+            </div>
+
+            <div class="flex items-center justify-end gap-4 order-3">
+                <div class="flex items-center gap-2">
+                    <select id="employee-switcher-select" class="input-themed px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </select>
+                    <span id="pdv-employee-online-status" class="text-sm font-semibold online-indicator hidden">Online</span>
+                    <span id="offline-indicator" class="hidden items-center gap-2 text-sm font-semibold text-red-600 ml-2 animate-pulse"><i class="fas fa-cloud"></i> Offline</span>
+                    <!-- NOVO: Contador de pedidos pendentes -->
+                    <span id="pending-orders-counter" class="hidden items-center gap-1 text-sm font-semibold text-amber-600 ml-2">
+                        <i class="fas fa-sync fa-spin"></i>
+                        <span id="pending-orders-count">0</span>
+                        <span>pendente(s)</span>
+                    </span>
+                    <button id="change-password-btn" class="text-color-secondary hover:text-blue-600 text-lg" title="Alterar Senha"><i class="fas fa-key"></i></button>
+                    <!-- NOVO: Botão de troca de tema -->
+                    <button class="theme-toggle-btn text-gray-500 hover:text-orange-500 text-lg p-2 rounded-full transition-colors" title="Alterar Tema">
+                        <i class="fas fa-sun theme-icon-sun"></i><i class="fas fa-moon theme-icon-moon"></i>
+                    </button>
+                </div>
+                <button id="manager-access-btn" class="text-gray-600 hover:text-orange-600 text-2xl" title="Acesso Gerencial Rápido"><i class="fas fa-user-shield pointer-events-none"></i></button>
+                
+                <button id="open-alerts-btn" class="relative bg-yellow-400 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-yellow-500" title="Central de Alertas">
+                    <i class="fas fa-bell"></i>
+                    <span id="alert-count-badge" class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                </button>
+
+                <button id="report-btn" class="bg-teal-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-teal-600">Relatório</button>
+                <button id="return-to-manager-btn" class="hidden bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600"><i class="fas fa-arrow-left mr-2"></i>Painel Gerencial</button>
+            </div>
+        </header>
+        <main class="flex flex-col lg:flex-row p-4 gap-4 overflow-y-auto lg:h-full">
+            <div class="pdv-action-buttons no-print">
+                <button id="btn-novo" class="pdv-action-btn btn-novo-pdv"><i class="fa fa-plus"></i><span>Novo</span></button>
+                <button id="btn-comprovante" class="pdv-action-btn btn-comprovante-pdv"><i class="fa fa-receipt"></i><span>Comprovante</span></button>
+                <button id="btn-fechar" class="pdv-action-btn btn-finalizar-pdv"><i class="fa fa-check-circle"></i><span>Finalizar Pedido</span></button>
+                <button id="btn-atualizar" class="pdv-action-btn btn-atualizar-pdv"><i class="fa fa-sync-alt"></i><span>Atualizar</span></button>
+                <button id="btn-cancelar" class="pdv-action-btn btn-cancelar-pdv"><i class="fa fa-times"></i><span>Cancelar</span></button>
+                <button id="liquidarBtn" class="pdv-action-btn btn-liquidar-pdv"><i class="fa fa-hand-holding-usd"></i><span>Liquidar Saldo</span></button>
+                <button id="btn-sair" class="pdv-action-btn btn-sair-pdv"><i class="fa fa-sign-out-alt"></i><span>Sair</span></button>
+            </div>
+
+            <div class="w-full flex flex-col gap-4 lg:flex-grow"> 
+                <div class="flex flex-col md:flex-row gap-4 items-stretch"> 
+                    <div class="surface-card rounded-2xl shadow-lg p-4 flex-1"> 
+                        <h2 class="text-lg font-bold text-gray-700 mb-3 border-b pb-2 flex items-center"><i class="fas fa-user mr-2 text-blue-500"></i>Dados do Cliente</h2>
+                        <div class="cliente-fields-wrapper"> 
+                            <!-- NOVO: Adicionado um container 'relative' para posicionar as sugestões -->
+                            <div class="relative">
+                                <input type="text" id="customer-name" placeholder="Nome e Sobrenome" class="input-themed w-full px-4 py-2 rounded-lg text-base" autocomplete="off">
+                                <div id="autocomplete-suggestions" class="absolute z-20 w-full surface-card border border-themed rounded-b-lg shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                            </div>
+                            <input type="text" id="customer-phone" placeholder="Telefone com DDD" class="input-themed px-4 py-2 rounded-lg text-base">
+                            <div class="flex items-center">
+                                <input type="date" id="delivery-date" class="input-themed px-4 py-2 rounded-lg text-base w-1/2">
+                                <span id="delivery-date-weekday" class="text-sm text-color-secondary ml-1 w-1/2 flex-shrink-0"></span>
+                            </div>
+                            <div class="relative">
+                                <input type="text" id="delivery-time" placeholder="Hora da Retirada" class="input-themed w-full px-4 py-2 rounded-lg text-base pr-8">
+                                <button id="clear-delivery-time-btn" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-red-500 hidden" title="Limpar horário">
+                                    <i class="fas fa-times-circle pointer-events-none"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <textarea id="order-observations" rows="2" class="input-themed w-full px-3 py-2 rounded-lg text-base" placeholder="Observações do Pedido..."></textarea>
+                        </div>
+                        <div id="client-history-heading" class="mt-4 mb-2 hidden">
+                            <h3 class="text-md font-semibold text-color-primary">Histórico Cliente</h3>
+                        </div>
+                        <div id="client-seal-container" class="hidden p-3 bg-blue-50 border-l-4 border-blue-500 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors duration-200">
+                            <div class="flex items-center justify-around w-full text-sm text-blue-800">
+                                <div class="text-center" title="Total de Compras">
+                                    <i class="fas fa-shopping-cart text-xl mb-1"></i>
+                                    <p id="seal-order-count" class="font-bold">--</p>
+                                </div>
+                                <div class="text-center" title="Status de Pagamento">
+                                    <i id="seal-payment-icon" class="fas fa-thumbs-up text-xl mb-1"></i>
+                                    <p id="seal-payment-status" class="font-bold">--</p>
+                                </div>
+                                <div class="text-center" title="Última Compra">
+                                    <i class="fas fa-cookie-bite text-xl mb-1"></i>
+                                    <p id="seal-client-since" class="font-bold">--</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="pdv-cardapio-container" class="surface-card rounded-2xl shadow-lg p-6 flex flex-col flex-grow">
+                    <h2 class="text-lg font-bold text-gray-700 mb-3 border-b pb-2 flex items-center"><i class="fas fa-utensils mr-2 text-blue-500"></i>Cardápio</h2>
+                    <div id="pdv-cardapio-grid" class="flex-grow">
+                        <div class="cardapio-column">
+                            <h3 class="cardapio-column-header bg-lime-600">Assados</h3>
+                            <div id="assados-column" class="cardapio-column-content space-y-3"></div>
+                        </div>
+                        <div class="cardapio-column">
+                            <h3 class="cardapio-column-header bg-orange-500">Frituras</h3>
+                            <div id="fritos-column" class="cardapio-column-content space-y-3"></div>
+                        </div>
+                        <div class="cardapio-column">
+                            <h3 class="cardapio-column-header bg-teal-500">Revenda</h3>
+                            <div id="revenda-column" class="cardapio-column-content space-y-3"></div>
+                        </div>
+                        <div class="cardapio-column">
+                            <h3 class="cardapio-column-header bg-slate-700">Produto Extra</h3>
+                            <div id="manual-item-input-section" class="mb-4 border-b pb-3"> 
+                                <h3 class="font-semibold text-sm mb-2">Adicionar Item Manualmente</h3>
+                                <div class="grid grid-cols-6 gap-2">
+                                    <input type="text" id="manual-item-desc" placeholder="Descrição" class="col-span-3 manual-item-input">
+                                    <input type="text" id="manual-item-price" placeholder="Valor (R$)" class="col-span-2 manual-item-input text-right">
+                                    <button id="add-manual-item-btn" class="col-span-1 manual-item-btn"><i class="fa fa-plus"></i></button>
+                                </div>
+                            </div>
+                            <div id="manual-items-display" class="space-y-3 mb-4">
+                            </div>
+                            <div id="extra-products-column-content" class="cardapio-column-content space-y-3">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="live-order-summary-panel" class="w-full lg:w-1/4 flex flex-col gap-4 no-print">
+                <div class="surface-card rounded-2xl shadow-lg p-4 flex flex-col">
+                    <div class="flex justify-between items-center mb-3 border-b pb-2">
+                        <h2 class="text-lg font-bold text-gray-700">
+                            <i class="fas fa-shopping-cart mr-2 text-blue-500"></i>Carrinho
+                        </h2>
+                        <button id="clear-cart-btn" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-md hover:bg-red-200 transition-colors" title="Limpar Carrinho"><i class="fas fa-trash-alt mr-1"></i>Limpar</button>
+                    </div>
+                    <div id="live-order-items" class="flex-1 overflow-y-auto space-y-2 pr-2">
+                        <p id="live-order-placeholder" class="text-center text-gray-400 italic mt-10">Adicione itens para visualizá-los aqui.</p>
+                    </div>
+                    <div id="live-order-kibe-warning" class="hidden text-center font-bold text-orange-600 bg-orange-100 p-2 rounded-lg mt-2 animate-pulse">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> * KIBE *
+                    </div>
+                    <div class="border-t mt-3 pt-3 text-right">
+                        <span class="text-color-secondary font-medium">Total de Salgados:</span>
+                        <span id="live-order-total" class="font-bold text-2xl ml-2 text-color-primary">0</span>
+                    </div>
+                </div>
+                <!-- Resumo do Pedido movido para baixo do Carrinho -->
+                <div class="surface-card rounded-2xl shadow-lg p-4 flex flex-col order-summary-panel">
+                    <h2 class="text-lg font-bold text-gray-700 mb-3 border-b pb-2 flex items-center"><i class="fas fa-file-invoice-dollar mr-2 text-blue-500"></i>Resumo do Pedido</h2>
+                    <div class="order-summary-metrics">
+                        <div class="osm-row total-row">
+                            <span class="osm-label">Valor a Pagar</span>
+                            <span id="total-value" class="osm-value main-total">R$ 0,00</span>
+                        </div>
+                        <div class="osm-row sinal-row hidden" aria-hidden="true">
+                            <label for="sinal-input" class="osm-label text-blue-600" id="sinal-label">SINAL</label>
+                            <div class="osm-input-wrapper">
+                                <input type="text" id="sinal-input" value="0,00" class="input-themed osm-input text-right font-bold text-blue-600 focus:outline-none" tabindex="-1" aria-label="Valor de Sinal (oculto)">
+                            </div>
+                        </div>
+                        <hr class="osm-separator">
+                        <div class="osm-row restante-row">
+                            <span class="osm-label" id="restante-label">Valor em Aberto</span>
+                            <span id="restante-value" class="osm-value restante-negative">R$ 0,00</span>
+                        </div>
+                    </div>
+                    <div id="order-traceability-info" class="text-xs text-gray-500 mt-3 text-right space-y-1">
+                        <p id="created-by-info" class="hidden"></p>
+                        <p id="settled-by-info" class="hidden"></p>
+                    </div>
+                    <div class="mt-3">
+                        <div id="payment-status-display" class="payment-status payment-devedor text-base w-full text-center">SALDO EM ABERTO</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Conteúdo do Painel do Gerente -->
+    <div id="manager-dashboard" class="hidden w-full h-full">
+        <div id="manager-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden"></div>
+
+        <div class="flex h-screen surface-background w-full">
+            <div id="manager-sidebar" class="sidebar-collapsed lg:sidebar-expanded">
+                <div class="flex items-center justify-center h-20 border-b border-gray-700 shrink-0">
+                    <i class="fas fa-chart-pie text-2xl text-orange-400"></i>
+                    <span class="sidebar-text ml-3 font-semibold text-xl">Painel Gerencial</span>
+                </div>
+                <nav class="flex-1 px-2 py-4 space-y-2">
+                    <a href="#" data-view="gerencial-dashboard" class="sidebar-link active"><i class="fas fa-chart-line w-6"></i><span class="sidebar-text">Análise e Dashboards</span></a>
+                    <a href="#" data-view="pedidos" class="sidebar-link"><i class="fas fa-receipt w-6"></i><span class="sidebar-text">Pedidos</span></a>
+                    <a href="#" data-view="alertas" class="sidebar-link relative">
+                        <i class="fas fa-bell w-6"></i>
+                        <span class="sidebar-text">Alertas de Dívidas</span>
+                        <span id="sidebar-alert-badge" class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                    </a>
+                    <a href="#" data-view="estoque" class="sidebar-link"><i class="fas fa-boxes w-6"></i><span class="sidebar-text">Estoque</span></a>
+                    <a href="#" data-view="cardapio" class="sidebar-link"><i class="fas fa-book-open w-6"></i><span class="sidebar-text">Cardápio</span></a>
+                    <a href="#" data-view="clientes" class="sidebar-link"><i class="fas fa-users w-6"></i><span class="sidebar-text">Clientes</span></a>
+                    <a href="#" id="sidebar-link-equipe" data-view="equipe" class="sidebar-link"><i class="fas fa-user-tie w-6"></i><span class="sidebar-text">Equipe</span></a>
+                    <a href="#" data-view="impressao" class="sidebar-link mt-4 border-t border-gray-700 pt-4"><i class="fas fa-print w-6"></i><span class="sidebar-text">Impressão</span></a>
+                    <a href="#" data-view="sistema" class="sidebar-link"><i class="fas fa-cogs w-6"></i><span class="sidebar-text">Sistema</span></a>
+                    <a href="#" data-view="log-atividades" class="sidebar-link"><i class="fas fa-history w-6"></i><span class="sidebar-text">Log de Atividades</span></a>
+                </nav>
+                <div class="px-2 py-4 border-t border-gray-700 shrink-0">
+                    <a href="#" id="manager-logout-btn" class="sidebar-link text-red-400 hover:bg-red-500 hover:text-white"><i class="fas fa-sign-out-alt w-6"></i><span class="sidebar-text">Sair</span></a>
+                </div>
+            </div>
+
+            <div id="manager-main-content-wrapper" class="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out">
+                <header class="surface-card shadow-md h-20 flex items-center justify-between px-4 lg:px-8">
+                    <button id="manager-menu-btn" class="p-2 rounded-lg text-gray-600 hover:bg-gray-200">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-2xl font-bold text-color-primary" id="page-title">Análise e Dashboards</h1>
+                        <p class="text-sm text-gray-500" id="page-subtitle">Visão completa do seu negócio com KPIs, gráficos e IA.</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <button id="go-to-pdv-btn" class="mr-2 lg:mr-6 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-600" title="Ir para o PDV"><i class="fas fa-cash-register mr-2"></i>Ir para PDV</button>
+                        
+                        <div class="relative">
+                            <button id="notification-bell-btn" class="text-gray-600 hover:text-orange-600 text-2xl relative">
+                                <i class="fas fa-bell"></i>
+                                <span id="notification-count" class="absolute -top-1 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                            </button>
+                            <div id="notification-dropdown">
+                                <div class="p-3 flex justify-between items-center border-b bg-gray-50">
+                                    <h4 class="font-bold">Notificações</h4>
+                                    <button id="mark-all-notifications-read-btn" class="text-xs text-blue-600 hover:underline">Marcar todas como lidas</button>
+                                </div>
+                                <div id="notification-list" class="flex-1 overflow-y-auto">
+                                    <p id="no-notifications-placeholder" class="text-center text-gray-500 p-8">Nenhuma notificação nova.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- NOVO: Botão de troca de tema -->
+                        <button class="theme-toggle-btn text-gray-500 hover:text-orange-500 text-lg p-2 rounded-full transition-colors" title="Alterar Tema">
+                            <i class="fas fa-sun theme-icon-sun"></i><i class="fas fa-moon theme-icon-moon"></i>
+                        </button>
+
+                        <div class="flex items-center gap-2">
+                            <span class="text-right"><p class="font-semibold" id="manager-name-display">Gerência</p><p class="text-xs text-green-500">Online</p></span>
+                            <i class="fas fa-user-shield text-2xl lg:text-3xl text-gray-600"></i>
+                        </div>
+                    </div>
+                </header>
+                <main id="manager-main-content" class="flex-1 p-8 overflow-y-auto">
+                    <div id="view-pedidos" class="hidden">
+                        <div class="surface-card p-6 rounded-xl shadow-lg">
+                            <h2 class="text-xl font-bold text-color-primary mb-4 border-b pb-2">Gestão de Pedidos</h2>
+                            <div class="flex flex-col md:flex-row gap-4 mb-6">
+                                <div class="relative flex-grow">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3"><i class="fas fa-search text-gray-400"></i></span>
+                                    <input type="text" id="filter-search-all" class="input-themed w-full pl-10 pr-4 py-2 rounded-lg text-sm" placeholder="Pesquisar em todos os campos...">
+                                </div>
+                                <button id="clear-filters-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 text-sm font-semibold"><i class="fas fa-times mr-2"></i>Limpar Filtros</button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="table-header-themed">
+                                        <tr>
+                                            <th class="py-2 px-3 text-left">Nº</th>
+                                            <th class="py-2 px-3 text-left">Data</th>
+                                            <th class="py-2 px-3 text-left">Cliente</th>
+                                            <th class="py-2 px-3 text-left">Valor a Pagar</th>
+                                            <th class="py-2 px-3 text-left">Status</th>
+                                            <th class="py-2 px-3 text-left">Vendedor</th>
+                                            <th class="py-2 px-3 text-left">Recebedor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="manager-orders-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- View: Cardápio -->
+                    <div id="view-cardapio" class="hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <div id="manager-cardapio-tab-container" class="manager-cardapio-tab-container">
+                                <!-- As abas do cardápio serão geradas dinamicamente aqui -->
+                            </div>
+                            <button id="manage-categories-btn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold">
+                                <i class="fas fa-layer-group mr-2"></i>Gerenciar Categorias
+                            </button>
+                        </div>
+                        <div id="content-cardapio-manager" class="surface-card p-6 rounded-xl shadow-lg">
+                            <div id="manager-products-list" class="space-y-4"></div>
+                            <div class="flex items-center justify-between mt-8 border-t pt-6">
+                                <button id="manager-add-product-btn" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 font-semibold">
+                                    <i class="fa fa-plus mr-2"></i>Adicionar Produto
+                                </button>
+                                <button id="manager-save-products-btn" class="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 font-bold text-lg shadow-lg transform hover:scale-105 transition-transform">
+                                    <i class="fas fa-save mr-2"></i>
+                                    Salvar Todas as Alterações
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- View: Estoque -->
+                    <div id="view-estoque" class="hidden">
+                        <div class="border-b border-themed surface-card p-4 rounded-t-xl shadow-lg">
+                            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                                <button id="tab-stock-repo" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500 employee-report-tab">Reposição</button>
+                                <button id="tab-stock-history" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300 employee-report-tab">Histórico</button>
+                            </nav>
+                        </div>
+                        <div id="content-stock-repo" class="surface-card p-6 rounded-b-xl shadow-lg">
+                            <p class="text-sm text-color-secondary mb-6">Adicione novas quantidades ao estoque existente. Os valores inseridos serão somados ao total atual.</p>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="table-header-themed">
+                                        <tr>
+                                            <th class="py-2 px-3 text-left">Produto</th>
+                                            <th class="py-2 px-3 text-center w-32">Estoque Atual</th>
+                                            <th class="py-2 px-3 text-center w-48">Adicionar Quantidade</th>
+                                            <th class="py-2 px-3 text-center w-32">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stock-management-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="content-stock-history" class="hidden surface-card p-6 rounded-b-xl shadow-lg">
+                            <div class="flex items-center gap-4 mb-4">
+                                <label for="stock-history-filter" class="font-semibold">Filtrar por Produto:</label>
+                                <select id="stock-history-filter" class="input-themed p-2 rounded-lg">
+                                    <option value="all">Todos os Produtos</option>
+                                </select>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="table-header-themed">
+                                        <tr>
+                                            <th class="py-2 px-3 text-left">Data/Hora</th>
+                                            <th class="py-2 px-3 text-left">Produto</th>
+                                            <th class="py-2 px-3 text-center">Alteração</th>
+                                            <th class="py-2 px-3 text-center">Estoque (Antes/Depois)</th>
+                                            <th class="py-2 px-3 text-left">Motivo</th>
+                                            <th class="py-2 px-3 text-left">Usuário</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stock-history-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- View: Alertas de Dívidas -->
+                    <div id="view-alertas" class="hidden surface-card p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold mb-4">Gestão de Alertas de Dívidas</h3>
+                        <p class="text-sm text-color-secondary mb-6">
+                            Pedidos com pagamentos pendentes que foram sinalizados pelos funcionários ou que estão expirados.
+                        </p>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="table-header-themed">
+                                    <tr>
+                                        <th class="py-2 px-3 text-left">Pedido</th>
+                                        <th class="py-2 px-3 text-left">Cliente</th>
+                                        <th class="py-2 px-3 text-left">Vendedor</th>
+                                        <th class="py-2 px-3 text-right">Débito</th>
+                                        <th class="py-2 px-3 text-left">Data Retirada</th>
+                                        <th class="py-2 px-3 text-left">Status Alerta</th>
+                                        <th class="py-2 px-3 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="manager-alerts-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- View: Clientes -->
+                    <div id="view-clientes" class="hidden surface-card p-6 rounded-xl shadow-lg flex flex-col h-full">
+                        <!-- Abas Alfabéticas A-Z -->
+                        <div id="clients-alpha-tabs" class="mb-4 flex flex-wrap gap-2 justify-center">
+                            <button class="alpha-tab-btn active" data-letter="all">Todos</button>
+                            <!-- As abas A-Z serão geradas dinamicamente -->
+                        </div>
+                        
+                        <!-- Filtros Avançados (simplificado) -->
+                        <!-- Mantemos apenas o campo de busca por nome. O input foi movido para a barra de ações abaixo. -->
+                        
+                        <!-- Botões de Ação + Campo de Busca (alinhados) -->
+                        <div class="mb-4 flex items-center justify-between gap-3">
+                            <div class="flex-1 max-w-md">
+                                <label for="name-search" class="block text-sm font-medium mb-1 sr-only">Buscar Nome</label>
+                                <input type="text" id="name-search" placeholder="Buscar nome..." class="w-full p-2 border rounded-lg" />
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <button id="add-client-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                                    ➕ Adicionar Cliente
+                                </button>
+                                <button id="send-whatsapp-messages-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                                    📱 Enviar Mensagens WhatsApp
+                                </button>
+                                <button id="send-good-clients-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                                    ⭐ Enviar para Clientes Bons
+                                </button>
+                                <button id="send-custom-segment-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                                    📊 Enviar para Segmento
+                                </button>
+                                <button id="view-marketing-reports-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                                    📈 Relatórios de Marketing
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-y-auto flex-grow">
+                            <table class="min-w-full text-sm">
+                                <thead class="table-header-themed sticky top-0">
+                                    <tr>
+                                        <th class="p-2 text-left w-8"><input type="checkbox" id="select-all-clients-checkbox" class="highlight-checkbox"></th>
+                                        <th class="py-2 px-3 text-left">Nome</th>
+                                        <th class="py-2 px-3 text-left">Telefones</th>
+                                        <th class="py-2 px-3 text-left">Status</th>
+                                        <th class="py-2 px-3 text-left">Frequência</th>
+                                        <th class="py-2 px-3 text-right">Débito</th>
+                                        <th class="py-2 px-3 text-center">Qtd. Compras</th>
+                                        <th class="py-2 px-3 text-left">Cliente Desde</th>
+                                        <th class="py-2 px-3 text-left">Ranking</th>
+                                        <th class="py-2 px-3 text-center">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="manager-clients-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Modal: Adicionar/Editar Cliente -->
+                        <div id="client-edit-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50 hidden">
+                            <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h2 id="client-edit-modal-title" class="text-xl font-bold">Novo Cliente</h2>
+                                    <button id="client-edit-close-btn" class="text-gray-500 hover:text-gray-700">✕</button>
+                                </div>
+                                <form id="client-edit-form" class="space-y-3">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Nome</label>
+                                            <input id="client-first-name" type="text" class="input-themed w-full px-3 py-2 rounded-lg" placeholder="Nome" required>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Sobrenome</label>
+                                            <input id="client-last-name" type="text" class="input-themed w-full px-3 py-2 rounded-lg" placeholder="Sobrenome">
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Telefone 1</label>
+                                            <input id="client-phone-1" type="tel" class="input-themed w-full px-3 py-2 rounded-lg" placeholder="(99) 99999-9999" required>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Telefone 2</label>
+                                            <input id="client-phone-2" type="tel" class="input-themed w-full px-3 py-2 rounded-lg" placeholder="(99) 9999-9999">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button type="button" id="client-delete-btn" class="hidden bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Excluir</button>
+                                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Salvar</button>
+                                    </div>
+                                    <input id="client-edit-initial-phone" type="hidden">
+                                </form>
+                            </div>
+                        </div>
+                                                <!-- Modal: Enviar para Clientes Bons -->
+                                                <div id="good-clients-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50 hidden">
+                                                    <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+                                                        <div class="flex items-center justify-between mb-3">
+                                                            <h2 class="text-xl font-bold">Mensagem para Clientes Bons</h2>
+                                                            <button id="good-clients-close-btn" class="text-gray-500 hover:text-gray-700">✕</button>
+                                                        </div>
+                                                        <div class="space-y-4">
+                                                            <p id="good-clients-count" class="text-sm text-gray-600"></p>
+                                                            <textarea id="good-clients-message" rows="4" class="input-themed w-full px-3 py-2 rounded-lg" placeholder="Digite a mensagem. Use {nome} para personalizar."></textarea>
+                                                            <div class="flex justify-end gap-2 pt-1">
+                                                                <button id="good-clients-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
+                                                                <button id="good-clients-send-btn" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-semibold">Enviar</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                    </div>
+                    <!-- View: Equipe -->
+                    <div id="view-equipe" class="hidden">
+                         <div class="border-b border-themed surface-card p-4 rounded-t-xl shadow-lg">
+                            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                                <button id="tab-equipe-diario" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500 employee-report-tab">Desempenho Diário</button>
+                                <button id="tab-equipe-mensal" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300 employee-report-tab">Desempenho Mensal</button>
+                            </nav>
+                        </div>
+                        <div id="content-equipe-diario" class="mt-6 space-y-6">
+                           <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-lg">
+                                <p class="font-bold">Desempenho de Hoje: <span id="equipe-diario-data"></span></p>
+                                <p>Exibindo automaticamente os dados para a data atual.</p>
+                           </div>
+                           <div id="team-daily-stats-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                        </div>
+                        <div id="content-equipe-mensal" class="hidden mt-6 space-y-6">
+                            <input type="month" id="equipe-month-picker" class="input-themed p-2 rounded-lg">
+                            <div id="team-monthly-stats-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                        </div>
+                        <div class="surface-card p-6 rounded-xl shadow-lg mt-8">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Gerenciamento de Funcionários</h3>
+                            <div class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div>
+                                    <label for="new-employee-name" class="block font-semibold mb-1">Nome do Novo Funcionário</label>
+                                    <input type="text" id="new-employee-name" placeholder="Nome Completo" class="input-themed w-full px-4 py-2 rounded-lg">
+                                </div>
+                                <div>
+                                    <label for="new-employee-role" class="block font-semibold mb-1">Cargo</label>
+                                    <select id="new-employee-role" class="input-themed w-full px-4 py-2 rounded-lg">
+                                        <option value="caixa">Caixa</option>
+                                        <option value="estoquista">Estoquista</option>
+                                        <option value="gerente">Gerente</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <button id="add-employee-btn" class="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold"><i class="fa fa-user-plus mr-2"></i> Adicionar Funcionário</button>
+                                </div>
+                            </div>
+                            <h4 class="font-semibold mb-3">Lista de Funcionários Cadastrados:</h4>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="table-header-themed">
+                                        <tr>
+                                            <th class="py-2 px-3 text-left">Nome</th>
+                                            <th class="py-2 px-3 text-left">Cargo</th>
+                                            <th class="py-2 px-3 text-left">Última Atividade</th>
+                                            <th class="py-2 px-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="employee-list-table-body">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                     <!-- View: Impressão -->
+                    <div id="view-impressao" class="hidden space-y-8">
+                        <div class="surface-card p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Configurações do Ticket de Impressão</h3>
+                            <div class="lg:flex lg:space-x-8 lg:items-start">
+                                <div class="space-y-6 lg:w-1/2">
+                                    <div><label for="manager-store-name" class="block font-semibold mb-1">Nome da Loja (Cabeçalho)</label><input type="text" id="manager-store-name" class="input-themed w-full px-4 py-2 rounded-lg"></div>
+                                    <div><label for="manager-store-phone" class="block font-semibold mb-1">Telefone da Loja (Cabeçalho)</label><input type="text" id="manager-store-phone" class="input-themed w-full px-4 py-2 rounded-lg"></div>
+                                    <div><label for="manager-ticket-title" class="block font-semibold mb-1">Título do Comprovante</label><input type="text" id="manager-ticket-title" class="input-themed w-full px-4 py-2 rounded-lg" placeholder="Ex: COMPROVANTE DE PEDIDO"></div>
+                                    <div><label for="manager-ticket-subtitle" class="block font-semibold mb-1">Subtítulo do Comprovante</label><input type="text" id="manager-ticket-subtitle" class="input-themed w-full px-4 py-2 border rounded-lg" placeholder="Ex: (NAO E DOCUMENTO FISCAL)"></div>
+                                    <div>
+                                        <label for="manager-footer-msg" class="block font-semibold mb-1">Mensagem de Rodapé</label>
+                                        <textarea id="manager-footer-msg" class="input-themed w-full px-4 py-2 rounded-lg" rows="5" placeholder="Ex: Obrigado pela compra! Volte sempre!"></textarea>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <input type="checkbox" id="manager-print-unit-price" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <label for="manager-print-unit-price" class="block font-semibold">Exibir valor unitário do salgado no ticket</label>
+                                    </div>
+                                    <div class="border-t pt-4 mt-4">
+                                        <label for="manager-kibe-print-size" class="block font-semibold mb-1">Destaque "KIBE" (se houver no pedido)</label>
+                                        <select id="manager-kibe-print-size" class="input-themed w-full px-4 py-2 rounded-lg">
+                                            <option value="disabled">Desativado</option>
+                                            <option value="1x">Tamanho 1 (Normal)</option>
+                                            <option value="2x">Tamanho 2 (Grande)</option>
+                                            <option value="3x">Tamanho 3 (Extra Grande)</option>
+                                            <option value="4x">Tamanho 4 (Gigante)</option>
+                                            <option value="5x">Tamanho 5 (Colossal)</option>
+                                        </select>
+                                    </div>
+                                    <button id="manager-save-ticket-btn" class="mt-4 bg-green-600 text-white px-8 py-2 rounded-lg hover:bg-green-700">Salvar Informações do Ticket</button>
+                                </div>
+                                <div class="mt-8 lg:mt-0 p-4 bg-gray-50 rounded-xl shadow-inner lg-w-1/2">
+                                    <h3 class="text-lg font-semibold mb-3 text-color-primary">Pré-visualização do Ticket</h3>
+                                    <div id="ticket-preview-container">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- View: Sistema -->
+                    <div id="view-sistema" class="hidden space-y-8">
+                        <div class="surface-card p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Metas e Produção</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                <div>
+                                    <label for="manager-monthly-goal" class="block font-semibold mb-1">Meta de Faturamento Mensal</label>
+                                    <div class="relative mt-1">
+                                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">R$</span>
+                                        <input type="text" id="manager-monthly-goal" class="input-themed w-full pl-8 pr-4 py-2 rounded-lg">
+                                    </div>
+                                    <button id="manager-save-goal-btn" class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-semibold">Salvar Meta</button>
+                                </div>
+                                <div>
+                                    <label for="overload-limit-input" class="block font-semibold mb-1">Controle de Sobrecarga de Produção</label>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <input type="number" id="overload-limit-input" class="input-themed w-24 p-2 rounded-lg text-center" title="Limite de salgados">
+                                        <span class="text-color-secondary">salgados em</span>
+                                        <input type="number" id="overload-window-input" class="input-themed w-24 p-2 rounded-lg text-center" title="Janela de tempo em minutos">
+                                        <span class="text-color-secondary">minutos.</span>
+                                    </div>
+                                    <button id="manager-save-overload-btn" class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-semibold">Salvar Controle</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="surface-card p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Configurações Gerais</h3>
+                             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                <div class="space-y-3">
+                                    <label for="loyalty-points-per-real" class="block font-semibold mb-1">Pontos por R$ 1,00 Gasto</label>
+                                    <input type="number" id="loyalty-points-per-real" placeholder="Ex: 1.0" step="0.1" class="input-themed w-full px-4 py-2 rounded-lg">
+                                </div>
+                                <div class="space-y-3">
+                                    <label for="loyalty-redemption-rate" class="block font-semibold mb-1">Valor em R$ por Ponto Resgatado</label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">R$</span>
+                                        <input type="number" id="loyalty-redemption-rate" placeholder="Ex: 0.01 (1 ponto = R$ 0,01)" step="0.001" class="input-themed w-full pl-8 pr-4 py-2 rounded-lg">
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="manager-save-loyalty-btn" class="mt-6 bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-semibold">Salvar Configurações de Fidelidade</button>
+                        </div>
+                        <div class="surface-card p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Segurança e Acesso</h3>
+                            <div class="space-y-4 max-w-md">
+                                <form id="manager-change-pass-form" onsubmit="return false" class="space-y-4">
+                                    <input type="text" autocomplete="username" id="manager-change-pass-username-hidden" class="sr-only" aria-hidden="true">
+                                    <div>
+                                        <label for="manager-change-pass-new" class="block font-semibold mb-1">Nova Senha de Gerência</label>
+                                        <input type="password" id="manager-change-pass-new" placeholder="Digite a nova senha (mín. 4 caracteres)" class="input-themed w-full px-4 py-2 rounded-lg" autocomplete="new-password">
+                                    </div>
+                                    <div>
+                                        <label for="manager-change-pass-confirm" class="block font-semibold mb-1">Confirmar Nova Senha</label>
+                                        <input type="password" id="manager-change-pass-confirm" placeholder="Confirme a nova senha" class="input-themed w-full px-4 py-2 rounded-lg" autocomplete="new-password">
+                                    </div>
+                                    <button id="manager-save-new-pass-system-btn" class="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 font-semibold">Alterar Senha da Gerência</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="surface-card p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Manuais de Uso</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <a href="MANUAL PDV FUNCIONARIO.pdf" target="_blank" class="flex items-center justify-center p-4 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition-colors">
+                                    <i class="fas fa-file-pdf text-2xl mr-3"></i>
+                                    <span class="font-semibold text-lg">Manual do Funcionário (PDV)</span>
+                                </a>
+                                <a href="MANUAL PDV GERENCIAL.pdf" target="_blank" class="flex items-center justify-center p-4 bg-purple-500 text-white rounded-lg shadow hover:bg-purple-600 transition-colors">
+                                    <i class="fas fa-file-pdf text-2xl mr-3"></i>
+                                    <span class="font-semibold text-lg">Manual do Gerente</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div id="firebase-access-section" class="surface-card p-6 rounded-xl shadow-lg">
+                            <h3 class="text-xl font-bold mb-4 border-b pb-2">Acesso Rápido</h3>
+                            <button id="firebase-access-btn" class="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-indigo-700 transition-colors">
+                                <i class="fas fa-database mr-2"></i> Acessar Console Firebase
+                            </button>
+                        </div>
+                        <div id="manager-risk-zone" class="surface-card p-6 rounded-xl shadow-lg border-l-4 border-red-500">
+                            <h3 class="text-xl font-bold text-red-600 mb-4 border-b pb-2">Área de Risco</h3><p class="text-color-secondary mb-4">Ação abaixo é irreversível e apagará todos os dados de pedidos e logs de funcionários.</p><div class="space-y-2"><label for="clear-data-confirm-input" class="text-sm font-semibold">Para confirmar, digite "APAGAR TUDO" no campo abaixo:</label><input type="text" id="clear-data-confirm-input" class="input-themed w-full px-4 py-2 rounded-lg" placeholder="APAGAR TUDO"></div><button id="manager-clear-data-btn" class="mt-4 bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Limpar Banco de Dados</button>
+                        </div>
+                    </div>
+                    <div id="view-master-reset" class="hidden">
+                        <div class="surface-card p-8 rounded-xl shadow-lg max-w-lg mx-auto">
+                            <h2 class="text-2xl font-bold text-red-600 mb-4">Acesso Mestra: Redefinir Senha</h2>
+                            <p class="text-color-secondary mb-6">Você entrou com a senha mestra. Cadastre uma nova senha para o usuário 'gerencia'.</p>
+                            <form id="master-reset-form" onsubmit="return false">
+                                <input type="text" autocomplete="username" id="master-reset-username-hidden" class="sr-only" aria-hidden="true">
+                                <input type="password" id="new-manager-pass" placeholder="Nova Senha para Gerência" class="input-themed w-full px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-red-500 text-lg" autocomplete="new-password">
+                                <button id="save-new-pass-btn" class="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition-colors">Salvar Nova Senha e Sair</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div id="view-log-atividades" class="hidden surface-card p-6 rounded-xl shadow-lg">
+                        <div class="flex flex-col md:flex-row gap-4 mb-6">
+                            <div class="relative flex-grow">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3"><i class="fas fa-search text-gray-400"></i></span>
+                                <input type="text" id="log-filter-search" class="input-themed w-full pl-10 pr-4 py-2 rounded-lg text-sm" placeholder="Pesquisar por usuário ou ação...">
+                            </div>
+                            <input type="date" id="log-filter-date" class="input-themed px-3 py-2 rounded-lg">
+                            <button id="log-clear-filters-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 text-sm font-semibold"><i class="fas fa-times mr-2"></i>Limpar Filtros</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="table-header-themed">
+                                    <tr>
+                                        <th class="py-2 px-3 text-left">Data/Hora</th>
+                                        <th class="py-2 px-3 text-left">Usuário</th>
+                                        <th class="py-2 px-3 text-left">Ação</th>
+                                        <th class="py-2 px-3 text-left">Detalhes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activity-log-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- *** INÍCIO DA ALTERAÇÃO *** -->
+                    <div id="gerencial-dashboard-screen" class="w-full h-full">
+                        <div class="space-y-8">
+                            <!-- Abas de Navegação -->
+                            <div class="border-b border-themed">
+                                <nav id="dashboard-tabs-nav" class="-mb-px flex space-x-8" aria-label="Tabs">
+                                    <button data-tab="visao-geral" class="dashboard-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-500">Visão Geral</button>
+                                    <button data-tab="clientes" class="dashboard-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">Análise de Clientes</button>
+                                    <button data-tab="produtos" class="dashboard-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">Produtos</button>
+                                </nav>
+                            </div>
+
+                            <!-- Conteúdo das Abas -->
+                            <div id="dashboard-tab-content">
+                                <!-- Aba: Visão Geral (populada pelo manager-realtime.js) -->
+                                <div id="tab-content-visao-geral" class="dashboard-tab-panel">
+                                    <!-- PASSO 2: Inserir os Cartões de Indicadores (KPIs) -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                        <!-- KPI: Faturamento do Dia -->
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4">
+                                            <div class="bg-green-100 p-3 rounded-full"><i class="fas fa-dollar-sign text-xl text-green-600"></i></div>
+                                            <div>
+                                                <p class="text-sm text-color-secondary">Faturamento do Dia</p>
+                                                <p id="kpi-faturamento-dia" class="text-2xl font-bold text-color-primary">R$ 0,00</p>
+                                            </div>
+                                        </div>
+                                        <!-- KPI: Pedidos do Dia -->
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4">
+                                            <div class="bg-blue-100 p-3 rounded-full"><i class="fas fa-receipt text-xl text-blue-600"></i></div>
+                                            <div>
+                                                <p class="text-sm text-color-secondary">Pedidos do Dia</p>
+                                                <p id="kpi-pedidos-dia" class="text-2xl font-bold text-color-primary">0</p>
+                                            </div>
+                                        </div>
+                                        <!-- KPI: Ticket Médio -->
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4">
+                                            <div class="bg-amber-100 p-3 rounded-full"><i class="fas fa-file-invoice-dollar text-xl text-amber-600"></i></div>
+                                            <div>
+                                                <p class="text-sm text-color-secondary">Ticket Médio (Dia)</p>
+                                                <p id="kpi-ticket-medio" class="text-2xl font-bold text-color-primary">R$ 0,00</p>
+                                            </div>
+                                        </div>
+                                        <!-- KPI: Meta Mensal -->
+                                        <div class="surface-card p-5 rounded-xl shadow-lg">
+                                            <div class="flex justify-between items-center mb-1">
+                                                <p class="text-sm text-color-secondary">Meta Mensal</p>
+                                                <p id="kpi-meta-percent" class="text-sm font-bold text-indigo-600">0%</p>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2.5"><div id="kpi-meta-progress" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div></div>
+                                            <p id="kpi-meta-valor" class="text-xs text-color-secondary mt-1 text-right">R$ 0,00 / R$ 0,00</p>
+                                        </div>
+                                    </div>
+                                    <!-- PASSO 3: Inserir os Contêineres dos Gráficos e Alertas -->
+                                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                                        <div class="lg:col-span-2 surface-card p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Faturamento por Hora (Hoje)</h3><div class="h-72"><canvas id="salesOverTimeChart"></canvas></div></div>
+                                        <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Vendas por Categoria (Hoje)</h3><div class="h-72"><canvas id="salesByCategoryChart"></canvas></div></div>
+                                    </div>
+                                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div class="lg:col-span-1 surface-card p-6 rounded-xl shadow-lg">
+                                            <div class="flex items-center mb-4">
+                                                <i class="fas fa-bullhorn text-xl text-red-500 mr-3"></i>
+                                                <h3 class="font-bold text-lg">Avisos Importantes</h3>
+                                            </div>
+                                            <div id="dashboard-alerts-container" class="space-y-3">
+                                                <p class="text-center text-gray-500 italic">Nenhum aviso no momento.</p>
+                                            </div>
+                                        </div>
+                                        <div class="lg:col-span-2 surface-card p-6 rounded-xl shadow-lg">
+                                            <h3 class="font-bold text-lg mb-4">Pedidos para Retirada Hoje</h3>
+                                            <div id="dashboard-daily-deliveries" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                                <p class="text-center text-gray-500 italic">Nenhuma retirada para hoje.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- *** FIM DA ALTERAÇÃO *** -->
+
+                                <!-- Aba: Análise de Clientes -->
+                                <div id="tab-content-clientes" class="dashboard-tab-panel hidden">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-blue-100 p-3 rounded-full"><i class="fas fa-users text-xl text-blue-600"></i></div><div><p class="text-sm text-color-secondary">Total de Clientes</p><p id="kpi-total-clientes" class="text-2xl font-bold text-color-primary">...</p></div></div>
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-green-100 p-3 rounded-full"><i class="fas fa-user-plus text-xl text-green-600"></i></div><div><p class="text-sm text-color-secondary">Novos (Mês)</p><p id="kpi-novos-clientes" class="text-2xl font-bold text-color-primary">...</p></div></div>
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-purple-100 p-3 rounded-full"><i class="fas fa-sync-alt text-xl text-purple-600"></i></div><div><p class="text-sm text-color-secondary">Clientes Recorrentes</p><p id="kpi-clientes-recorrentes" class="text-2xl font-bold text-color-primary">...</p></div></div>
+                                        <div class="surface-card p-5 rounded-xl shadow-lg flex items-center gap-4"><div class="bg-amber-100 p-3 rounded-full"><i class="fas fa-chart-line text-xl text-amber-600"></i></div><div><p class="text-sm text-color-secondary">Taxa de Retenção</p><p id="kpi-taxa-retencao" class="text-2xl font-bold text-color-primary">...%</p></div></div>
+                                    </div>
+                                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                        <div class="lg:col-span-2 surface-card p-6 rounded-xl shadow-lg">
+                                            <h3 class="font-bold text-lg mb-4">Top 10 Clientes (por valor gasto)</h3>
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full text-sm">
+                                                    <thead class="table-header-themed"><tr class="text-left"><th class="p-2">#</th><th class="p-2">Nome</th><th class="p-2">Telefone</th><th class="p-2 text-right">Total Gasto</th><th class="p-2 text-center">Pedidos</th></tr></thead>
+                                                    <tbody id="top-clients-table-body"></tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-8">
+                                            <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Crescimento de Novos Clientes (6 Meses)</h3><div><canvas id="client-growth-chart"></canvas></div></div>
+                                            <div class="surface-card p-6 rounded-xl shadow-lg"><h3 class="font-bold text-lg mb-4">Segmentação de Clientes</h3><div><canvas id="client-segmentation-chart"></canvas></div></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Aba: Produtos (placeholder) -->
+                                <div id="tab-content-produtos" class="dashboard-tab-panel hidden">
+                                    <p>Conteúdo da análise de produtos virá aqui.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="category-manager-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[105]">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+            <h2 class="text-2xl font-bold mb-4">Gerenciar Categorias do Cardápio</h2>
+            <p class="text-sm text-color-secondary mb-4">Arraste para reordenar. Renomeie ou oculte categorias para personalizar a exibição no PDV e no painel. As alterações são salvas localmente no seu navegador.</p>
+            <ul id="category-list-manager" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                <!-- Categories will be populated here by JS -->
+            </ul>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="category-manager-cancel-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                <button id="category-manager-save-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+    <div id="price-history-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 h-4/6 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4 text-center">Histórico de Preços: <span id="history-product-name" class="text-blue-600"></span></h2>
+            <div class="flex-1 overflow-y-auto border rounded-lg">
+                <table class="min-w-full text-sm">
+                    <thead class="table-header-themed sticky top-0">
+                        <tr>
+                            <th class="py-3 px-4 text-left">Data da Alteração</th>
+                            <th class="py-3 px-4 text-right">Preço de Venda</th>
+                            <th class="py-3 px-4 text-right">Custo</th>
+                            <th class="py-3 px-4 text-left">Alterado Por</th>
+                        </tr>
+                    </thead>
+                    <tbody id="price-history-table-body"></tbody>
+                </table>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button id="price-history-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400 font-semibold">Fechar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="change-password-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+            <h2 class="text-2xl font-bold mb-4 text-center">Alterar Minha Senha</h2>
+            <form id="change-password-form" onsubmit="return false" class="space-y-4">
+                <input type="text" autocomplete="username" id="change-password-username-hidden" class="sr-only" aria-hidden="true">
+                <div>
+                    <label for="current-password-input" class="block font-semibold mb-1">Senha Atual</label>
+                    <input type="password" id="current-password-input" placeholder="Digite sua senha atual" class="input-themed w-full px-4 py-2 rounded-lg" autocomplete="current-password">
+                </div>
+                <div>
+                    <label for="new-password-input" class="block font-semibold mb-1">Nova Senha</label>
+                    <input type="password" id="new-password-input" placeholder="Mínimo de 4 caracteres" class="input-themed w-full px-4 py-2 rounded-lg" autocomplete="new-password">
+                </div>
+                <div>
+                    <label for="confirm-password-input" class="block font-semibold mb-1">Confirmar Nova Senha</label>
+                    <input type="password" id="confirm-password-input" placeholder="Repita a nova senha" class="input-themed w-full px-4 py-2 rounded-lg" autocomplete="new-password">
+                </div>
+            </form>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="change-password-cancel-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                <button id="change-password-save-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Salvar Nova Senha</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
+            <div id="reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
+                <div id="reminder-weekday-highlight" class="text-center text-4xl font-bold text-blue-600 mb-4 uppercase tracking-wider"></div> 
+                <h2 id="reminder-title" class="text-2xl md:text-3xl font-bold text-color-primary mb-2">Lembrete de Produção (HOJE)</h2>
+                <p class="text-gray-600 mb-6">Pedidos com retirada para hoje (<span id="reminder-date"></span>)</p>
+                <div class="bg-sky-50 p-4 rounded-lg mb-6">
+                    <h3 class="text-xl font-semibold mb-3 text-sky-800">Total de Itens para Produzir</h3>
+                    <div id="reminder-summary-items" class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-gray-700"></div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">Lista de Pedidos</h3>
+                    <div id="reminder-orders-list" class="space-y-4"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-col sm:flex-row justify-end gap-4 no-print">
+                <button id="reminder-print-btn" class="bg-blue-600 text-white px-8 py-2 rounded-lg hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button>
+                <button id="reminder-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
+            </div>
+        </div>
+    </div>
+    <div id="whatsapp-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[101]"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-xl font-bold mb-4">Enviar Mensagem para <span id="whatsapp-client-name" class="text-blue-600"></span></h2><textarea id="whatsapp-message-input" class="input-themed w-full p-2 rounded-lg mb-4" rows="5" placeholder="Digite sua mensagem aqui..."></textarea><div class="flex justify-end gap-4"><button id="whatsapp-modal-cancel" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="whatsapp-modal-send" class="bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600">Enviar</button></div></div></div>
+    <div id="ticket-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-40"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4"><h2 class="text-2xl font-bold mb-4 text-center no-print">Opções de Comprovante</h2><div class="surface-alt p-4 rounded-lg border max-h-96 overflow-y-auto printable-area"><pre id="ticket-content" class="whitespace-pre-wrap text-sm" style="font-family: 'Courier New', Courier, monospace;"></pre></div><div class="mt-6 grid grid-cols-2 gap-4 no-print"><button id="ticket-print-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"><i class="fa fa-print mr-2"></i>Imprimir</button><button id="ticket-whatsapp-btn" class="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600"><i class="fab fa-whatsapp mr-2"></i>WhatsApp</button></div><button id="close-ticket-modal-btn" class="w-full mt-4 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 no-print">Fechar</button></div></div>
+    <div id="manager-order-detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 h-5/6 flex flex-col"><h2 class="text-2xl font-bold mb-4 text-center">Detalhes do Pedido <span id="detail-order-number"></span></h2><div id="detail-order-content" class="flex-1 overflow-y-auto space-y-4"></div><div class="mt-6 flex justify-end gap-4"><button id="detail-reactivate-btn" class="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 hidden">Reativar Pedido</button><button id="detail-release-edit-btn" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 hidden">Liberar Edição (Gerência)</button><button id="detail-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button></div></div></div>
+    <div id="custom-confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[110]"><div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-sm mx-4 text-center"><h3 class="text-xl font-bold mb-4 text-color-primary" id="confirm-modal-title"></h3><p class="text-color-secondary mb-6" id="confirm-modal-message"></p><form id="confirm-modal-input-form" onsubmit="return false"><div id="confirm-modal-input-container" class="mb-4 hidden space-y-2"><input type="text" id="confirm-modal-input-user" class="input-themed w-full px-4 py-2 rounded-lg" placeholder="Usuário" autocomplete="username"><input type="password" id="confirm-modal-input-pass" class="input-themed w-full px-4 py-2 rounded-lg" placeholder="Senha" autocomplete="current-password"></div></form><div class="flex justify-center gap-4"><button id="confirm-modal-cancel-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Cancelar</button><button id="confirm-modal-ok-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">Confirmar</button></div></div></div>
+    
+    <div id="employee-report-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-40">
+        <div class="surface-card p-4 md:p-6 rounded-2xl shadow-2xl w-full max-w-[95%] h-[95%] flex flex-col">
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <h2 class="text-2xl md:text-3xl font-bold text-color-primary mb-4 no-print" id="employee-report-main-title">Relatório de Pedidos</h2>
+                
+                <div class="flex border-b border-gray-200 no-print">
+                    <button id="employee-main-tab-pedidos" class="py-2 px-4 text-base md:text-lg font-semibold text-gray-700 border-b-2 border-transparent hover:text-blue-600 employee-report-tab active-tab">Pedidos</button>
+                    <button id="employee-main-tab-producao" class="py-2 px-4 text-base md:text-lg font-semibold text-gray-500 hover:text-gray-700 employee-report-tab">Resumo de Produção</button>
+                </div>
+
+                <div id="employee-content-main-pedidos" class="flex flex-col overflow-hidden flex-1 pt-4">
+                    <div class="flex flex-col mb-4 flex-wrap gap-2 no-print">
+                         <div class="surface-alt p-4 rounded-lg shadow-inner border border-themed flex flex-col sm:flex-row flex-wrap items-center gap-4 w-full">
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <i class="fa fa-search text-gray-400"></i>
+                                <input type="text" id="employee-report-search-input" placeholder="Filtrar por nome/número..." class="input-themed px-3 py-2 rounded-lg w-full">
+                            </div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <label for="employee-report-request-date-picker" class="font-semibold text-gray-700 text-sm">Data Solicitação:</label>
+                                <input type="date" id="employee-report-request-date-picker" class="input-themed px-3 py-2 rounded-lg w-full">
+                            </div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <label for="employee-report-delivery-date-picker" class="font-semibold text-gray-700 text-sm">Data Retirada:</label>
+                                <input type="date" id="employee-report-delivery-date-picker" class="input-themed px-3 py-2 rounded-lg w-full">
+                             </div>
+                             <div class="flex items-center gap-4 w-full sm:w-auto border-l pl-4">
+                                <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="employee-report-filter-devedor" class="h-4 w-4 rounded"> Devedores</label>
+                                <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="employee-report-filter-pago" class="h-4 w-4 rounded"> Pagos</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex border-b border-gray-200 no-print">
+                        <button id="employee-sub-tab-pedidos-dia" class="py-2 px-4 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:text-blue-600 active-tab">Pedidos do Dia</button>
+                        <button id="employee-sub-tab-pedidos-futuros" class="py-2 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700">Pedidos Futuros</button>
+                    </div>
+                    <div id="employee-table-container" class="flex-1 overflow-y-auto mt-4">
+                        <div class="overflow-x-auto border rounded-lg">
+                            <table class="min-w-full text-sm">
+                                <thead class="table-header-themed sticky top-0 z-10">
+                                    <tr>
+                                        <th class="py-2 px-3 text-left w-8"></th>
+                                        <th class="py-2 px-3 text-left">Nº Pedido</th>
+                                        <th class="py-2 px-3 text-left">Data Solicitação</th>
+                                        <th class="py-2 px-3 text-left">Nome Cliente</th>
+                                        <th class="py-2 px-3 text-left">Itens Pedidos</th>
+                                        <th class="py-2 px-3 text-left">Valor a Pagar</th>
+                                        <th class="py-2 px-3 text-left">Valor em Aberto</th>
+                                        <th class="py-2 px-3 text-left">Data Retirada</th>
+                                        <th class="py-2 px-3 text-left">Horário Retirada</th>
+                                        <th class="py-2 px-3 text-center no-print">WhatsApp</th>
+                                        <th class="py-2 px-3 text-left">Vendedor</th>
+                                        <th class="py-2 px-3 text-left">Recebedor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="employee-report-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="employee-content-main-producao" class="hidden flex-1 pt-4 overflow-y-auto space-y-6">
+                    <div class="bg-amber-100 border-l-4 border-amber-500 text-amber-800 p-4 rounded-lg">
+                        <h3 class="font-bold text-lg">Resumo de Produção para Hoje (<span id="daily-summary-date"></span>)</h3>
+                        <p class="text-sm">Esta é a lista de todos os itens que precisam ser produzidos para atender aos pedidos com retirada na data de hoje.</p>
+                        <div id="daily-summary-content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-3 mt-4 text-sm">
+                        </div>
+                        <div class="mt-4 text-lg font-bold text-amber-900">Total de Salgados: <span id="total-salgados-producao">0</span></div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg shadow-inner border">
+                        <h3 class="font-semibold text-gray-700 mb-3">Relatórios Adicionais</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <button id="show-today-reminder-btn" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 font-semibold">
+                                <i class="fas fa-calendar-check mr-2"></i>Lembrete de Produção (Hoje)
+                            </button>
+                            <button id="show-tomorrow-reminder-btn" class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 font-semibold">
+                                <i class="fas fa-calendar-day mr-2"></i>Lembrete de Produção (Amanhã)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="mt-4 flex flex-col sm:flex-row justify-end items-center no-print flex-shrink-0 gap-4">
+                <button id="employee-report-print-btn" class="w-full sm:w-auto bg-yellow-400 text-gray-800 px-6 py-2 rounded-lg hover:bg-yellow-500"><i class="fa fa-print mr-2"></i>Imprimir</button>
+                <button id="employee-report-close-btn" class="w-full sm:w-auto bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO MODAL PARA LEMBRETE DE AMANHÃ -->
+    <div id="tomorrow-reminder-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col mx-4">
+            <div id="tomorrow-reminder-content-to-print" class="flex-1 overflow-y-auto printable-area">
+                <div id="tomorrow-reminder-weekday-highlight" class="text-center text-4xl font-bold text-purple-600 mb-4 uppercase tracking-wider"></div>
+                <h2 id="tomorrow-reminder-title" class="text-2xl md:text-3xl font-bold text-color-primary mb-2">Lembrete de Produção (Amanhã)</h2>
+                <p class="text-gray-600 mb-6">Pedidos com retirada para amanhã (<span id="tomorrow-reminder-date"></span>)</p>
+                <div class="bg-purple-50 p-4 rounded-lg mb-6">
+                    <h3 class="text-xl font-semibold mb-3 text-purple-800">Total de Itens para Produzir</h3>
+                    <div id="tomorrow-reminder-summary-items" class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-gray-700"></div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-700">Lista de Pedidos</h3>
+                    <div id="tomorrow-reminder-orders-list" class="space-y-4"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-col sm:flex-row justify-end gap-4 no-print">
+                <button id="tomorrow-reminder-print-btn" class="bg-purple-600 text-white px-8 py-2 rounded-lg hover:bg-purple-700"><i class="fa fa-print mr-2"></i>Imprimir</button>
+                <button id="tomorrow-reminder-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="team-member-monthly-detail-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 h-5/6 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4 text-center">Desempenho Mensal Detalhado: <span id="team-member-detail-name"></span></h2>
+            <div class="flex-1 overflow-y-auto space-y-4">
+            </div>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="team-member-detail-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="interactive-time-selector-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[102]">
+        <div class="surface-card p-5 rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col">
+            <h3 class="text-xl font-bold mb-4 text-center">Selecione o Horário de Retirada</h3>
+
+            <div class="flex justify-between items-center surface-alt p-3 rounded-lg mb-4 border border-themed">
+                <div id="time-selector-selected-date" class="font-semibold text-gray-700 text-base">
+                </div>
+                <div id="time-selector-daily-total" class="bg-orange-100 text-orange-800 text-sm font-bold px-4 py-2 rounded-full">
+                </div>
+            </div>
+            
+            <div id="time-selector-warning-message" class="hidden bg-amber-100 border-l-4 border-amber-500 text-amber-800 p-3 rounded-lg mb-4 text-sm">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <strong>Atenção:</strong> Alguns horários já estão com alta demanda. Considere sugerir um horário alternativo para o cliente.
+            </div>
+
+            <div id="time-slots-container" class="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto max-h-80 pr-2">
+            </div>
+
+            <div class="flex items-center gap-2 p-3 border-t border-gray-200 mt-4">
+                <label for="manual-time-input" class="text-sm font-semibold text-gray-600 whitespace-nowrap">Ou digite:</label>
+                <input type="text" id="manual-time-input" placeholder="HH:MM" class="input-themed flex-grow px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center" maxlength="5">
+                <button id="confirm-manual-time-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700" title="Usar horário digitado">
+                    <i class="fas fa-check mr-1"></i> Usar
+                </button>
+            </div>
+
+            <div class="mt-5 flex justify-end">
+                <button id="interactive-time-selector-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400 font-semibold">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overload-warning-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[103]">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-lg mx-4 text-center">
+            <div class="text-amber-500 mb-4">
+                <i class="fas fa-exclamation-triangle fa-3x"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-3 text-color-primary">Aviso de Sobrecarga de Produção</h3>
+            <p class="text-gray-600 mb-6 leading-relaxed" id="overload-warning-message">
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button id="overload-change-time-btn" class="bg-gray-300 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold order-2 sm:order-1">
+                    <i class="fas fa-clock mr-2"></i>Voltar e Alterar
+                </button>
+                <button id="overload-continue-anyway-btn" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 font-bold order-1 sm:order-2">
+                    <i class="fas fa-check-circle mr-2"></i>Continuar Mesmo Assim</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="client-history-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 h-5/6 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4 text-center">Histórico de Pedidos: <span id="client-history-client-name" class="text-blue-600"></span></h2>
+            <div class="flex-1 overflow-y-auto border rounded-lg">
+                <table class="min-w-full text-sm">
+                    <thead class="table-header-themed sticky top-0">
+                        <tr>
+                            <th class="py-3 px-4 text-left">Nº Pedido</th>
+                            <th class="py-3 px-4 text-left">Data</th>
+                            <th class="py-3 px-4 text-right">Valor Total</th>
+                            <th class="py-3 px-4 text-center">Status Pag.</th>
+                            <th class="py-3 px-4 text-center">Status Pedido</th>
+                        </tr>
+                    </thead>
+                    <tbody id="client-history-orders-list">
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button id="client-history-close-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400 font-semibold">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="expired-orders-alert-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-[104]">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 h-5/6 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-color-primary">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-3"></i>Central de Alertas
+                </h2>
+                <button id="expired-orders-alert-close-btn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <p class="text-sm text-color-secondary mb-4">
+                Os pedidos abaixo possuem saldo em aberto e a data de retirada já passou. Por favor, investigue se houve um erro na baixa do pagamento.
+            </p>
+            <div id="expired-orders-list" class="flex-1 overflow-y-auto border rounded-lg p-2 bg-gray-50 space-y-2">
+            </div>
+        </div>
+    </div>
+
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="app.js"></script>
+    <script type="module" src="pdv.js"></script>
+    <script type="module" src="manager.js"></script>
+    <!-- Modal de Templates de Mensagens -->
+    <div id="message-templates-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 h-5/6 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4">📝 Templates de Mensagens</h2>
+            <div class="flex-1 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="template-category">
+                        <h3 class="font-semibold mb-2">🎉 Promocionais</h3>
+                        <div class="space-y-2">
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="promo-1">
+                                <strong>Oferta Especial</strong><br>
+                                <small>Olá {nome}! Temos uma oferta especial para você...</small>
+                            </button>
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="promo-2">
+                                <strong>Desconto Fidelidade</strong><br>
+                                <small>Como cliente VIP, você tem 20% de desconto...</small>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="template-category">
+                        <h3 class="font-semibold mb-2">📅 Lembretes</h3>
+                        <div class="space-y-2">
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="reminder-1">
+                                <strong>Lembrete de Pedido</strong><br>
+                                <small>Olá {nome}! Seu pedido está pronto para retirada...</small>
+                            </button>
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="reminder-2">
+                                <strong>Aniversário</strong><br>
+                                <small>Parabéns {nome}! Hoje é seu aniversário...</small>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="template-category">
+                        <h3 class="font-semibold mb-2">💬 Relacionamento</h3>
+                        <div class="space-y-2">
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="relationship-1">
+                                <strong>Feedback</strong><br>
+                                <small>Olá {nome}! Como foi sua experiência conosco?</small>
+                            </button>
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="relationship-2">
+                                <strong>Volta dos Inativos</strong><br>
+                                <small>Sentimos sua falta {nome}! Que tal um pedido especial?</small>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="template-category">
+                        <h3 class="font-semibold mb-2">🎯 Segmentados</h3>
+                        <div class="space-y-2">
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="segment-1">
+                                <strong>Clientes Devedores</strong><br>
+                                <small>Olá {nome}, temos uma proposta para regularizar...</small>
+                            </button>
+                            <button class="template-btn w-full text-left p-3 border rounded-lg hover:bg-gray-50" data-template="segment-2">
+                                <strong>Novos Produtos</strong><br>
+                                <small>Olá {nome}! Temos novidades que você vai adorar...</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <label class="block text-sm font-medium mb-2">Mensagem Personalizada:</label>
+                    <textarea id="custom-message-template" rows="4" class="w-full p-3 border rounded-lg" placeholder="Digite sua mensagem personalizada... Use {nome} para personalizar com o nome do cliente."></textarea>
+                </div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button id="use-template-btn" class="bg-green-500 text-white px-6 py-2 rounded-lg">Usar Template</button>
+                <button id="close-templates-modal-btn" class="bg-gray-500 text-white px-6 py-2 rounded-lg">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Envio de Mensagens WhatsApp -->
+    <div id="whatsapp-send-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 h-5/6 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4">📱 Enviar Mensagens WhatsApp</h2>
+            <div class="flex-1 overflow-y-auto">
+                <!-- Opções de Seleção de Clientes -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">Selecionar Clientes</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="radio" name="client-selection" value="selected" class="mr-2">
+                                <span>Clientes Selecionados na Tabela</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="client-selection" value="all" class="mr-2">
+                                <span>Todos os Clientes</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="client-selection" value="filtered" class="mr-2">
+                                <span>Clientes Filtrados (conforme filtros aplicados)</span>
+                            </label>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="radio" name="client-selection" value="good" class="mr-2">
+                                <span>Clientes Bons (5+ pedidos, sem débito)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="client-selection" value="active" class="mr-2">
+                                <span>Clientes Ativos (pedidos recentes)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="client-selection" value="debtor" class="mr-2">
+                                <span>Clientes Devedores</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-blue-800">
+                            <strong>Clientes que receberão a mensagem:</strong> <span id="selected-clients-count">0</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Opções de Mensagem -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">Mensagem</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Tipo de Mensagem:</label>
+                            <select id="message-type" class="w-full p-3 border rounded-lg">
+                                <option value="custom">Mensagem Personalizada</option>
+                                <option value="template">Usar Template</option>
+                            </select>
+                        </div>
+                        
+                        <div id="custom-message-section">
+                            <label class="block text-sm font-medium mb-2">Digite sua mensagem:</label>
+                            <textarea id="whatsapp-message-text" rows="4" class="w-full p-3 border rounded-lg" placeholder="Digite sua mensagem aqui... Use {nome} para personalizar com o nome do cliente."></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Use {nome} para personalizar com o nome do cliente automaticamente.</p>
+                        </div>
+                        
+                        <div id="template-section" class="hidden">
+                            <label class="block text-sm font-medium mb-2">Selecionar Template:</label>
+                            <select id="message-template-select" class="w-full p-3 border rounded-lg">
+                                <option value="">Escolha um template...</option>
+                                <option value="promo-1">🎉 Oferta Especial</option>
+                                <option value="promo-2">💎 Desconto VIP</option>
+                                <option value="reminder-1">📦 Lembrete de Pedido</option>
+                                <option value="reminder-2">🎂 Mensagem de Aniversário</option>
+                                <option value="relationship-1">⭐ Solicitar Feedback</option>
+                                <option value="relationship-2">😊 Volta dos Inativos</option>
+                                <option value="segment-1">💬 Proposta para Devedores</option>
+                                <option value="segment-2">🆕 Novos Produtos</option>
+                            </select>
+                            <div id="template-preview" class="mt-2 p-3 bg-gray-50 rounded-lg hidden">
+                                <p class="text-sm font-medium">Preview:</p>
+                                <p id="template-preview-text" class="text-sm text-gray-700"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configurações de Envio -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">Configurações de Envio</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="delay-between-messages" checked class="mr-2">
+                                <span>Delay de 1 segundo entre mensagens</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">Recomendado para evitar bloqueios do WhatsApp</p>
+                        </div>
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="confirm-before-send" checked class="mr-2">
+                                <span>Confirmar antes de enviar</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">Mostrar confirmação antes de abrir as abas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4 flex gap-2">
+                <button id="send-whatsapp-confirm-btn" class="bg-green-500 text-white px-6 py-2 rounded-lg font-semibold">
+                    📱 Enviar Mensagens
+                </button>
+                <button id="close-whatsapp-modal-btn" class="bg-gray-500 text-white px-6 py-2 rounded-lg">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatórios de Marketing -->
+    <div id="marketing-reports-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 items-center justify-center z-50">
+        <div class="surface-card p-6 rounded-2xl shadow-2xl w-full max-w-6xl mx-4 h-5/6 flex flex-col">
+            <h2 class="text-2xl font-bold mb-4">📈 Relatórios de Marketing</h2>
+            <div class="flex-1 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-blue-800">📊 Estatísticas Gerais</h3>
+                        <div id="general-stats" class="mt-2 text-sm">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-green-800">🎯 Segmentação</h3>
+                        <div id="segmentation-stats" class="mt-2 text-sm">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-purple-800">📱 Campanhas</h3>
+                        <div id="campaign-stats" class="mt-2 text-sm">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold mb-3">📋 Histórico de Campanhas</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="p-2 text-left">Data</th>
+                                    <th class="p-2 text-left">Tipo</th>
+                                    <th class="p-2 text-left">Segmento</th>
+                                    <th class="p-2 text-left">Enviados</th>
+                                    <th class="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="campaign-history-table">
+                                <!-- Será preenchido dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button id="export-reports-btn" class="bg-blue-500 text-white px-6 py-2 rounded-lg">Exportar Relatório</button>
+                <button id="close-reports-modal-btn" class="bg-gray-500 text-white px-6 py-2 rounded-lg">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="offlineManager.js"></script>
+    <script type="module" src="manager-realtime.js"></script>
+    <script type="module" src="charts.js"></script>
+    <script type="module" src="employeeManagement.js"></script>
+    <script type="module" src="employeeReport.js"></script>
+    <script type="module" src="pdv-live-summary.js"></script>
+    <script type="module" src="utils.js"></script>
+    <script type="module" src="domRefs.js"></script>
+    <script type="module" src="alertState.js"></script>
+    <script type="module" src="activityLog.js"></script>
+    <script type="module" src="aiService.js"></script>
+    <script type="module" src="firebaseService.js"></script>
+    <script type="module" src="auth.js"></script>
+
+</body>
+</html>

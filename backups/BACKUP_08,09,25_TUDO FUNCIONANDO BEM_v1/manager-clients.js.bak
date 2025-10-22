@@ -1,0 +1,236 @@
+﻿import { dom } from './domRefs.js';
+import { formatCurrency, formatDateToBR, formatPhone as utilsFormatPhone, showToast, openWhatsappModal } from './utils.js';
+import { fetchClients } from './firebaseService.js';
+import { deleteClientByPhone as deleteClientByPhoneSvc } from './firebaseService.js';
+
+export let allClients = [];
+
+export async function loadClients() {
+    console.log("loadClients: Carregando clientes.");
+    if (!dom.manager || !dom.manager.clientsTableBody) {
+        console.error("Elemento dom.manager.clientsTableBody não encontrado.");
+        return;
+    }
+    allClients = await fetchClients();
+
+renderAlphaTabs();
+    renderClientsTable();
+    setupClientsEvents();
+
+document.querySelectorAll('.client-whatsapp-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const { name, phone } = e.currentTarget.dataset;
+            openWhatsappModal(phone, name);
+        });
+    });
+    console.log("loadClients: Clientes carregados e renderizados.");
+}
+
+export function renderAlphaTabs() {
+    if (!dom.manager.clientsAlphaTabs) return;
+    const existingTabs = dom.manager.clientsAlphaTabs.querySelectorAll('.alpha-tab-btn:not([data-letter="all"])');
+    existingTabs.forEach(tab => tab.remove());
+
+const letterCounts = {};
+    allClients.forEach(client => {
+        const firstLetter = client.name.charAt(0).toUpperCase();
+        letterCounts[firstLetter] = (letterCounts[firstLetter] || 0) + 1;
+    });
+
+for (let i = 65; i <= 90; i++) {
+        const letter = String.fromCharCode(i);
+        const count = letterCounts[letter] || 0;
+        const tabBtn = document.createElement('button');
+        tabBtn.className = 'alpha-tab-btn';
+        tabBtn.setAttribute('data-letter', letter);
+        tabBtn.textContent = letter;
+        if (count > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'alpha-tab-badge';
+            badge.textContent = count;
+            tabBtn.appendChild(badge);
+        }
+        dom.manager.clientsAlphaTabs.appendChild(tabBtn);
+    }
+}
+
+export function renderClientsTable(filterLetter = null) {
+    if (!dom.manager.clientsTableBody) return;
+    dom.manager.clientsTableBody.innerHTML = '';
+
+let filteredClients = allClients;
+    if (filterLetter && filterLetter !== 'all') {
+        filteredClients = allClients.filter(client => client.name.charAt(0).toUpperCase() === filterLetter);
+    }
+    filteredClients.sort((a,b) => a.name.localeCompare(b.name));
+
+filteredClients.forEach(client => {
+        const rank = calculateClientRank(client);
+        const status = getClientStatus(client);
+        const frequency = getClientFrequency(client);
+        const phones = getClientPhones(client);
+
+const row = dom.manager.clientsTableBody.insertRow();
+        row.className = 'border-b hover:bg-gray-50';
+        row.innerHTML = `
+            <td class="p-2 text-center"><input type="checkbox" class="highlight-checkbox client-checkbox" data-phone="${client.phone}"></td>
+            <td class="py-2 px-3 font-semibold">${client.name}</td>
+            <td class="py-2 px-3">${phones}</td>
+            <td class="py-2 px-3">${status}</td>
+            <td class="py-2 px-3">${frequency}</td>
+            <td class="py-2 px-3 text-right font-semibold ${client.totalDebt > 0.01 ? 'text-red-600' : 'text-green-600'}">${client.totalDebt > 0.01 ? formatCurrency(client.totalDebt) : 'Não tem débito'}</td>
+            <td class="py-2 px-3 text-center align-middle">
+                <span class="inline-block bg-blue-100 text-blue-800 text-base font-bold px-3 py-1 rounded-full">${client.orderCount}</span>
+            </td>
+            <td class="py-2 px-3">${formatDateToBR(client.firstOrderDate)}</td>
+            <td class="py-2 px-3">
+                <span class="px-3 py-1 text-xs font-bold rounded-full text-white ${rank.color} inline-flex items-center gap-1.5" title="Ranking do Cliente">
+                    <i class="fas ${rank.icon}"></i><span>${rank.text}</span>
+                </span>
+            </td>
+            <td class="py-2 px-3 text-center space-x-3">
+                <button class="text-green-500 hover:text-green-700 text-lg client-whatsapp-btn" data-phone="${client.phone}" data-name="${client.name}" title="WhatsApp">
+                    <i class="fab fa-whatsapp"></i>
+                </button>
+                <button class="text-blue-600 hover:text-blue-800 text-lg client-edit-btn" data-phone="${client.phone}" data-name="${client.name}" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="text-red-600 hover:text-red-800 text-lg client-delete-btn" data-phone="${client.phone}" data-name="${client.name}" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        dom.manager.clientsTableBody.appendChild(row);
+    });
+}
+
+function getClientStatus(client) {
+    if (client.totalDebt > 0.01) {
+        return '<span class="client-status-badge client-status-devedor">Devedor</span>';
+    }
+    const lastOrderDate = client.lastOrderDate ? new Date(client.lastOrderDate) : null;
+    const now = new Date();
+    const daysSinceLastOrder = lastOrderDate ? Math.floor((now - lastOrderDate) / (1000 * 60 * 60 * 24)) : null;
+    if (!lastOrderDate || daysSinceLastOrder > 90) {
+        return '<span class="client-status-badge client-status-inativo">Inativo</span>';
+    }
+    return '<span class="client-status-badge client-status-ativo">Ativo</span>';
+}
+
+function getClientFrequency(client) {
+    const stars = Math.min(5, Math.max(1, Math.floor(client.orderCount / 2)));
+    const starHtml = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+    return `
+        <div class="client-frequency">
+            <span class="frequency-stars">${starHtml}</span>
+            <span class="text-sm text-gray-600">${client.orderCount} pedidos</span>
+        </div>
+    `;
+}
+
+function getClientPhones(client) {
+    const phones = [];
+    if (client.phone) phones.push({ number: client.phone, isPrimary: true });
+    if (client.phones && Array.isArray(client.phones)) {
+        client.phones.forEach(phone => { if (phone && phone !== client.phone) phones.push({ number: phone, isPrimary: false }); });
+    }
+    if (phones.length === 0) return '<span class="text-gray-400">Sem telefone</span>';
+    if (phones.length === 1) return `<span class="font-mono">${utilsFormatPhone(phones[0].number)}</span>`;
+    const phoneItems = phones.map(phone => `
+        <div class="client-phone-item ${phone.isPrimary ? 'client-phone-primary' : ''}">
+            <span class="font-mono">${utilsFormatPhone(phone.number)}</span>
+            ${phone.isPrimary ? '<span class="text-xs bg-blue-100 text-blue-800 px-1 rounded">Principal</span>' : ''}
+        </div>
+    `).join('');
+    return `<div class="client-phone-list">${phoneItems}</div>`;
+}
+
+export function setupClientsEvents() {
+    if (dom.manager.clientsAlphaTabs) {
+        dom.manager.clientsAlphaTabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('alpha-tab-btn')) {
+                const letter = e.target.getAttribute('data-letter');
+                dom.manager.clientsAlphaTabs.querySelectorAll('.alpha-tab-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                renderClientsTable(letter);
+            }
+        });
+    }
+    if (dom.manager.sendWhatsappMessagesBtn) dom.manager.sendWhatsappMessagesBtn.addEventListener('click', () => openWhatsappSendModal());
+    if (dom.manager.sendGoodClientsBtn) dom.manager.sendGoodClientsBtn.addEventListener('click', () => sendToGoodClients());
+    if (dom.manager.sendCustomSegmentBtn) dom.manager.sendCustomSegmentBtn.addEventListener('click', () => openMessageTemplatesModal());
+    if (dom.manager.viewMarketingReportsBtn) dom.manager.viewMarketingReportsBtn.addEventListener('click', () => openMarketingReportsModal());
+    if (dom.manager.nameSearch) dom.manager.nameSearch.addEventListener('input', () => applyAdvancedFilters());
+    setupMarketingModalsEvents();
+    const addClientBtn = document.getElementById('add-client-btn');
+    if (addClientBtn) addClientBtn.addEventListener('click', () => openClientEditModal());
+
+if (dom.manager.clientsTableBody) {
+        dom.manager.clientsTableBody.addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('.client-edit-btn');
+            const deleteBtn = e.target.closest('.client-delete-btn');
+            const whatsappBtn = e.target.closest('.client-whatsapp-btn');
+            if (editBtn) { const { phone } = editBtn.dataset; const client = allClients.find(c => c.phone === phone); openClientEditModal(client); return; }
+            if (deleteBtn) { const { phone, name } = deleteBtn.dataset; if (!confirm(`Tem certeza que deseja excluir o cliente "${name}"?`)) return; await deleteClientByPhoneSvc(phone); await loadClients(); showToast('Cliente excluído com sucesso.', 'success'); return; }
+            if (whatsappBtn) { const { name, phone } = whatsappBtn.dataset; openWhatsappModal(phone, name); return; }
+        });
+    }
+}
+
+function sendToGoodClients() {
+    const goodClients = allClients.filter(client => client.orderCount >= 5 && client.totalDebt <= 0.01);
+    if (goodClients.length === 0) { alert('Nenhum cliente atende aos critérios de "cliente bom" (5+ pedidos e sem débito).'); return; }
+    const message = prompt(`Enviar mensagem para ${goodClients.length} clientes bons:\n\nDigite a mensagem:`);
+    if (!message || message.trim() === '') return;
+    if (!confirm(`Confirma o envio da mensagem para ${goodClients.length} clientes bons?`)) return;
+    sendBulkMessages(goodClients, message, 'Clientes Bons');
+}
+
+function applyAdvancedFilters() {
+    const nameSearch = dom.manager.nameSearch?.value?.toLowerCase().trim() || '';
+    if (!nameSearch) { renderClientsTable(); return; }
+    const filteredClients = allClients.filter(client => client.name && client.name.toLowerCase().includes(nameSearch));
+    renderClientsTableWithFilters(filteredClients);
+}
+
+function clearAdvancedFilters() {
+    if (dom.manager.nameSearch) dom.manager.nameSearch.value = '';
+    if (dom.manager.clientsAlphaTabs) {
+        dom.manager.clientsAlphaTabs.querySelectorAll('.alpha-tab-btn').forEach(btn => btn.classList.remove('active'));
+        const allTab = dom.manager.clientsAlphaTabs.querySelector('[data-letter="all"]');
+        if (allTab) allTab.classList.add('active');
+    }
+    renderClientsTable();
+}
+
+function renderClientsTableWithFilters(filteredClients) {
+    if (!dom.manager.clientsTableBody) return;
+    dom.manager.clientsTableBody.innerHTML = '';
+    filteredClients.sort((a,b) => a.name.localeCompare(b.name));
+    filteredClients.forEach(client => {
+        const rank = calculateClientRank(client);
+        const status = getClientStatus(client);
+        const frequency = getClientFrequency(client);
+        const phones = getClientPhones(client);
+        const row = dom.manager.clientsTableBody.insertRow();
+        row.className = 'border-b hover:bg-gray-50';
+        row.innerHTML = `...`;
+        dom.manager.clientsTableBody.appendChild(row);
+    });
+}
+
+function calculateClientRank(client) {
+    if (!client) return { text: 'N/A', color: 'bg-gray-400', icon: 'fa-user' };
+    if (client.totalDebt > 100) return { text: 'Devedor', color: 'bg-red-600', icon: 'fa-exclamation' };
+    if (client.orderCount >= 20) return { text: 'VIP', color: 'bg-yellow-500', icon: 'fa-star' };
+    if (client.orderCount >= 10) return { text: 'Fiel', color: 'bg-green-500', icon: 'fa-heart' };
+    return { text: 'Comum', color: 'bg-blue-500', icon: 'fa-user' };
+}
+
+function setupMarketingModalsEvents() {  }
+function openWhatsappSendModal() {  }
+function openMessageTemplatesModal() {  }
+function openMarketingReportsModal() {  }
+function openClientEditModal(client = null) {  }
+function sendBulkMessages(clients, message, tag) {  }
+
