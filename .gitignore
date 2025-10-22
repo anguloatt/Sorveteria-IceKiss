@@ -1,5 +1,7 @@
 # Ignorar backups e arquivos grandes
 backups/
+serviceAccountKey.json
+token.json
 *.pdf
 *.txt
 *.xlsx
